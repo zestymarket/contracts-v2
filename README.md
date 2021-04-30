@@ -3,7 +3,8 @@ Zesty Market is a set of smart contracts that allow creators to tokenize digital
 
 These NFTs can be rented out through a marketplace which allows advertisers to purchase a timeslot to advertise. Price discovery is done through a Dutch auction.
 
-With this mechanism, Zesty Market allows creators to create digital assets that are able to generate revenue. Such NFTs can act as financial assets to support underwriting, giving creators a way of taking on loans, or insurance to support their creative endeavors.
+With this mechanism, Zesty Market allows creators to create digital assets that are able to generate revenue. 
+Such NFTs can act as financial assets to support underwriting, giving creators a way of taking on loans, or insurance to support their creative endeavors.
 
 Advertisers, are able to advertise in a trustless way. 
 Advertisers can be sure that their ad spend has not be siphoned resulting in lost reach, and be sure that creators have received the ad monies directly.
@@ -59,9 +60,15 @@ The NFTs would accrue $ZEST upon successful auctions. Creating a price floor for
 
 **Specifications**
 
-## AuctionHTLC_ZEST 
+## AuctionHTLC_ZEST.sol
 **Specifications**
 
-## AuctionHTLC_STABLE
+## AuctionHTLC_STABLE.sol
 
-## AuctionHTLC_ETH
+## AuctionHTLC_ETH.sol
+
+## Validator.sol
+
+## ZestyDAO.sol
+
+## Zesty
