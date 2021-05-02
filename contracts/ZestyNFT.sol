@@ -2,9 +2,9 @@
 
 pragma solidity ^0.7.0;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/GSN/Context.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
+import "./openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "./openzeppelin/contracts/GSN/Context.sol";
+import "./openzeppelin/contracts/math/SafeMath.sol";
 
 contract ZestyNFT is ERC721 { 
     using SafeMath for uint256;
@@ -31,7 +31,6 @@ contract ZestyNFT is ERC721 {
         address indexed publisher,
         uint256 timeCreated,
         string uri,
-        string tokenInfo,
         uint256 timestamp
     );
 
