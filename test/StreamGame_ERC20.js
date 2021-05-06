@@ -1,8 +1,7 @@
 const { expect } = require('chai');
 const { ethers } = require('hardhat');
 
-describe('StreamGame', function() {
-  let zestyToken;
+describe('StreamGame_ERC20', function() {
   let streamGame;
   let signers;
 
@@ -12,9 +11,8 @@ describe('StreamGame', function() {
     const ZestyToken = await ethers.getContractFactory('ZestyToken');
     zestyToken = await ZestyToken.deploy();
     await zestyToken.deployed();
-    
 
-    const StreamGame = await ethers.getContractFactory('StreamGame');
+    const StreamGame = await ethers.getContractFactory('StreamGame_ERC20');
     streamGame = await StreamGame.deploy(zestyToken.address);
     await streamGame.deployed();
 
@@ -23,11 +21,6 @@ describe('StreamGame', function() {
     await zestyToken.connect(signers[1]).approve(streamGame.address, 100000000);
     await zestyToken.transfer(signers[2].address, 100000);
     await zestyToken.connect(signers[2]).approve(streamGame.address, 100000000);
-  });
-
-  it('It should have the right usdc address', async function() {
-    let data = await streamGame.getUsdcAddress()
-    expect(data).to.equal(zestyToken.address);
   })
 
   it('It should create a game, allow someone to donate, and allow creator to withdraw', async function() {

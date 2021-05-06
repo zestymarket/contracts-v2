@@ -7,17 +7,13 @@ import "./openzeppelin/contracts/GSN/Context.sol";
 import "./openzeppelin/contracts/math/SafeMath.sol";
 import "./openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract StreamGame is Context {
+contract StreamGame_ERC20 is Context {
     using SafeMath for uint256;
-    address private _dao;
-    // USDC Address
-    // ETH mainnet: 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48
-    // Matic sidechain: 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174
-    address private _usdc;
+    address private _erc20Address;
     uint256 private _gameCount = 0;
 
-    constructor(address usdc_) {
-        _usdc = usdc_;
+    constructor(address erc20Address_) {
+        _erc20Address = erc20Address_;
     }
 
     struct GameState {
@@ -52,7 +48,7 @@ contract StreamGame is Context {
     modifier tokensTransferrable(address _sender, uint256 _amount) {
         require(_amount > 0, "Cannot send 0 USDC");
         require(
-            IERC20(_usdc).allowance(_sender, address(this)) >= _amount,
+            IERC20(_erc20Address).allowance(_sender, address(this)) >= _amount,
             "USDC allowance is not sufficient, increase allowance"
         );
         _;
@@ -64,7 +60,7 @@ contract StreamGame is Context {
     }
 
     function getUsdcAddress() public view returns (address) {
-        return _usdc;
+        return _erc20Address;
     }
 
     function getGameState(uint256 _gameId) public view returns (
@@ -81,7 +77,7 @@ contract StreamGame is Context {
         currentMessage = g.currentMessage;
     }
 
-    function start() public returns (uint256) {
+    function start() external returns (uint256) {
         _gameCount = _gameCount.add(1);
 
         _gameStates[_gameCount] = GameState(
@@ -101,11 +97,13 @@ contract StreamGame is Context {
     }
 
     function donate(uint256 _gameId, uint256 _val, string memory _message)
-        public 
+        external 
         gameExists(_gameId)
         tokensTransferrable(_msgSender(), _val)
     {
-        if (!IERC20(_usdc).transferFrom(_msgSender(), address(this), _val))
+        require(_val > 0, "Value needs to be greater than 0");
+
+        if (!IERC20(_erc20Address).transferFrom(_msgSender(), address(this), _val))
             revert("Transfer of usdc to contract failed");
 
         GameState storage g = _gameStates[_gameId];
@@ -124,14 +122,16 @@ contract StreamGame is Context {
     }
 
     function withdraw(uint256 _gameId) 
-        public 
+        external 
         gameExists(_gameId)
     {
         GameState storage g = _gameStates[_gameId];
+        require(g.totalDonations > 0, "No funds to withdraw");
+
         uint256 withdrawAmt = g.totalDonations;
         g.totalDonations = 0;
 
-        IERC20(_usdc).transfer(g.creator, withdrawAmt);
+        IERC20(_erc20Address).transfer(g.creator, withdrawAmt);
 
         emit GameStateWithdraw(
             _gameId,
