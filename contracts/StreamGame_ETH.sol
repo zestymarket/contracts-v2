@@ -39,7 +39,8 @@ contract StreamGame_ETH is Context {
 
     event GameStateWithdraw(
         uint256 indexed gameId,
-        address indexed creator
+        address indexed creator,
+        uint256 timestamp
     );
 
     modifier gameExists(uint256 _gameId) {
@@ -117,7 +118,8 @@ contract StreamGame_ETH is Context {
 
         emit GameStateWithdraw(
             _gameId,
-            g.creator
+            g.creator,
+            block.timestamp
         );
     }
 }
