@@ -60,6 +60,17 @@ The NFTs would accrue $ZEST upon successful auctions. Creating a price floor for
 
 **Specifications**
 
+## StreamGame_ETH.sol
+StreamGame_ETH is designed to receive donations while a streamer is streaming. The events generated would trigger some screen overlay to encourage viewer engagement.
+
+**Addresses**
+```
+Rinkeby: 0x54892179A43B3A1C8275B9B893843f8eDe23368f
+```
+
+**Specifications**
+
+
 ## AuctionHTLC_ZEST.sol
 **Specifications**
 
@@ -70,5 +81,3 @@ The NFTs would accrue $ZEST upon successful auctions. Creating a price floor for
 ## Validator.sol
 
 ## ZestyDAO.sol
-
-## Zesty

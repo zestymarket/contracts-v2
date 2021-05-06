@@ -1,5 +1,4 @@
 const hre = require("hardhat");
-const { time } = require('@openzeppelin/test-helpers');
 
 async function main() {
   signers = await ethers.getSigners();
@@ -22,9 +21,6 @@ async function main() {
   );
   await auctionHTLC_ZEST.deployed();
   console.log("AuctionHTLC_ZEST deployed to:", auctionHTLC.address);
-
-  timeNow = await time.latest();
-  timeNow = timeNow.toNumber();
 }
 
 main()
