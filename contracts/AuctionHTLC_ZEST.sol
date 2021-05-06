@@ -23,17 +23,6 @@ contract AuctionHTLC_ZEST is Context, Ownable, ERC721Holder {
 
     /**
      * @dev Variables used in the contract
-     * @param _zestyTokenAddress Address where the ERC20 ZestyToken ($ZEST) is deployed
-     * @param _zestyNFTAddress Address where the ERC721 ZestyNFT is deployed
-     * @param _validator Address of validator (this could be an account or contract)
-     * @param _auctionCount Count of the number of auctions on chain, used to track id
-     * @param _contractCount Count of the number of contracts on chain, used to track id
-     * @param _availabilityThreshold Minimum percentage of shares required to withdraw funds from contract
-     * @param _burnPerc Percentage of desposited ERC20 ZestyToken ($ZEST) burned after a contract ends (cancellation, withdrawal, refund)
-     * @param _profitSharePerc Percentage of deposited ERC20 ZestyToken redistributed to the DAO after successful withdrawal
-     * @param _validatorPerc Percentage of deposited ERC20 ZestyToken ($ZEST) transferred to validator address after successful withdrawal
-     * @param _zestyToken ERC20 ZestyToken contract instance
-     * @param _zestyNFT ERC721 ZestyNFT contract instance
      */
     address private _zestyTokenAddress;
     address private _zestyNFTAddress;
@@ -49,9 +38,9 @@ contract AuctionHTLC_ZEST is Context, Ownable, ERC721Holder {
 
     /** 
      * @dev Constructor sets the various params into private variables declared above
-     * @param _zestyTokenAddress Address where the ERC20 ZestyToken ($ZEST) is deployed
-     * @param _zestyNFTAddress Address where the ERC721 ZestyNFT is deployed
-     * @param _validator Address of validator (this could be an account or contract)
+     * @param zestyTokenAddress_ Address where the ERC20 ZestyToken ($ZEST) is deployed
+     * @param zestyNFTAddress_ Address where the ERC721 ZestyNFT is deployed
+     * @param validator_ Address of validator (this could be an account or contract)
      */
     constructor(
         address zestyTokenAddress_, 
@@ -74,22 +63,22 @@ contract AuctionHTLC_ZEST is Context, Ownable, ERC721Holder {
      * @param seller Address of entity that deposited the ZestyNFT into the contract
      * @param defaultRates Default cost in $ZEST per unix second for a declared adslot
      * @param displayWithoutApproval Flag to indicate whether adslot declared require approvals before display
-     * @param buyerCanCreateSlots Flag to indicate whether buyers can declare adslots without seller's permission
+     * @param buyerCanCreateAuction Flag to indicate whether buyers can declare adslots without seller's permission
      * @param zestyTokenValue Amount of $ZEST accrued in the NFT, $ZEST is earned upon successful AuctionHTLC
      */
     struct NFTDeposit {
         address seller;
         uint256 defaultRates;
         bool displayWithoutApproval;
-        bool buyerCanCreateSlots;
+        bool buyerCanCreateAuction;
         uint256 zestyTokenValue;
     }
     event NewNFTDeposit(
         uint256 indexed tokenId,
         address indexed seller,
         uint256 defaultStartingPrice,
-        bool allowAdDisplayWithoutApproval,
-        bool allowBuyerToCreateAdSlots,
+        bool displayWithoutApproval,
+        bool buyerCanCreateAuction,
         uint256 timestamp
     );
     event NewNFTWithdrawal(
@@ -108,7 +97,7 @@ contract AuctionHTLC_ZEST is Context, Ownable, ERC721Holder {
     }
 
     function getZestyNFTAddress() external view returns (address) {
-        return _NFTAddress;
+        return _zestyNFTAddress;
     }
 
     function getValidatorAddress() external view returns (address) {
@@ -122,19 +111,20 @@ contract AuctionHTLC_ZEST is Context, Ownable, ERC721Holder {
     function depositZestyNFT(
         uint256 _tokenId,
         uint256 _defaultStartingPrice,
-        bool _allowAdDisplayWithoutApproval,
-        bool _allowBuyerToCreateAdSlots
+        bool _displayWithoutApproval,
+        bool _buyerCanCreateAuction
     ) public {
         require(
-            _zestyNFT.getApproved(_tokenId == address(this)),
+            _zestyNFT.getApproved(_tokenId) == address(this),
             "AuctionHTLC_ZEST: Contract is not approved to manage token"
         );
 
         _nftDeposits[_tokenId] = NFTDeposit(
             _msgSender(),
             _defaultStartingPrice,
-            _allowAdDisplayWithoutApproval,
-            _allowBuyerToCreateAdSlots
+            _displayWithoutApproval,
+            _buyerCanCreateAuction,
+            0
         );
 
         _zestyNFT.safeTransferFrom(_msgSender(), address(this), _tokenId);
@@ -143,8 +133,8 @@ contract AuctionHTLC_ZEST is Context, Ownable, ERC721Holder {
             _tokenId,
             _msgSender(),
             _defaultStartingPrice,
-            _allowAdDisplayWithoutApproval,
-            _allowBuyerToCreateAdSlots,
+            _displayWithoutApproval,
+            _buyerCanCreateAuction,
             block.timestamp
         );
     }

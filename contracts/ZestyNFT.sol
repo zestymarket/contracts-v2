@@ -41,11 +41,7 @@ contract ZestyNFT is ERC721 {
 
     mapping (uint256 => tokenData) private _tokenData;
 
-    function mint(
-        uint256 _timeStart,
-        uint256 _timeEnd,
-        string memory _uri
-    ) public {
+    function mint(string memory _uri) public {
         // Checks
         uint256 _timeNow = block.timestamp;
 
