@@ -24,23 +24,20 @@ contract StreamGame_ETH is Context {
 
     event GameStateNew (
         uint256 indexed gameId,
-        address indexed creator,
-        uint256 timestamp
+        address indexed creator
     );
 
     event GameStateUpdate(
         uint256 indexed gameId,
-        address indexed creator,
         address indexed currentDonor,
+        uint256 currentDonation,
         string currentMessage,
-        uint256 totalDonations,
-        uint256 timestamp
+        uint256 totalDonations
     );
 
     event GameStateWithdraw(
         uint256 indexed gameId,
-        address indexed creator,
-        uint256 timestamp
+        address indexed creator
     );
 
     modifier gameExists(uint256 _gameId) {
@@ -68,14 +65,13 @@ contract StreamGame_ETH is Context {
         _gameStates[_gameCount] = GameState(
             _msgSender(),   // creator
             address(0),     // donor 
-            0,              // current donations
+            0,              // total donations
             ""             // current message
         );
 
         emit GameStateNew(
             _gameCount,
-            _msgSender(),
-            block.timestamp
+            _msgSender()
         );
 
         return _gameCount;
@@ -95,11 +91,10 @@ contract StreamGame_ETH is Context {
 
         emit GameStateUpdate(
             _gameId,
-            g.creator,
             _msgSender(),
+            msg.value,
             g.currentMessage,
-            g.totalDonations,
-            block.timestamp
+            g.totalDonations
         );
     }
 
@@ -118,8 +113,7 @@ contract StreamGame_ETH is Context {
 
         emit GameStateWithdraw(
             _gameId,
-            g.creator,
-            block.timestamp
+            g.creator
         );
     }
 }
