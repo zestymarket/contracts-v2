@@ -65,7 +65,7 @@ StreamGame_ETH is designed to receive donations while a streamer is streaming. T
 
 **Addresses**
 ```
-Rinkeby: 0x2de8027aE03435d55d75548792047D562AA7a7Cf
+Rinkeby: 0x4F170B8F6939c4aEe8d32B264628Ae64478c5804
 ```
 
 **Specifications**
