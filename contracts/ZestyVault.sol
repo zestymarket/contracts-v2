@@ -14,30 +14,10 @@ abstract contract ZestyVault is ERC721Holder, Context {
     address private _zestyNFTAddress;
     ZestyNFT private _zestyNFT;
     
-    constructor (address zestyNFTAddress_) {
+    constructor(address zestyNFTAddress_) {
         _zestyNFTAddress = zestyNFTAddress_;
         _zestyNFT = ZestyNFT(zestyNFTAddress_);
     }
-
-    /*
-     * NFT Deposit Struct and Events
-     */
-
-    /**
-     * @dev Struct stores information NFTDeposit
-     * @param seller Address of entity that deposited the ZestyNFT into the contract
-     * @param defaultRates Default cost in $ZEST per unix second for a declared adslot
-     * @param displayWithoutApproval Flag to indicate whether adslot declared require approvals before display
-     * @param buyerCanCreateAuction Flag to indicate whether buyers can declare adslots without seller's permission
-     * @param zestyTokenValue Amount of $ZEST accrued in the NFT, $ZEST is earned upon successful AuctionHTLC
-     */
-    event NewNFTDeposit(
-        uint256 indexed tokenId,
-        address indexed depositor
-    );
-    event NewNFTWithdrawal(
-        uint256 indexed tokenId
-    );
 
     mapping (uint256 => address) private _nftDeposits;
 
@@ -72,14 +52,7 @@ abstract contract ZestyVault is ERC721Holder, Context {
         );
     }
 
-    function _withdrawZestyNFT(uint256 _tokenId) internal virtual {
-        address d = _nftDeposits[_tokenId];
-
-        require(
-            d == _msgSender(),
-            "ZestyVault: Cannot withdraw as caller did not deposit the ZestyNFT"
-        );
-
+    function _withdrawZestyNFT(uint256 _tokenId) internal virtual onlyDepositor(_tokenId) {
         delete _nftDeposits[_tokenId];
 
         _zestyNFT.safeTransferFrom(address(this), _msgSender(), _tokenId);
@@ -88,5 +61,15 @@ abstract contract ZestyVault is ERC721Holder, Context {
             _tokenId,
             _msgSender()
         );
+    }
+
+    modifier onlyDepositor(_tokenId) {
+        address d = _nftDeposits[_tokenId];
+
+        require(
+            d == _msgSender(),
+            "ZestyVault: Cannot withdraw as caller did not deposit the ZestyNFT"
+        );
+        _;
     }
 }
