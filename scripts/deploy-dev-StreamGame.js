@@ -15,9 +15,9 @@ async function main() {
   
   await streamGame.connect(signers[2]).donate(1, 'test2', {value: 2000});
 
-  await streamGame.connect(signers[3]).donate(1, 'test2', {value: 3000});
+  await streamGame.connect(signers[3]).donate(1, 'test3', {value: 3000});
 
-  await streamGame.connect(signers[1]).donate(1, 'test', {value: 1000});
+  await streamGame.connect(signers[1]).donate(1, 'test1', {value: 1000});
 
   // Withdraw
   await streamGame.connect(signers[3]).withdraw(ethers.BigNumber.from(1));
