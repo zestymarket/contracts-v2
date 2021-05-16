@@ -10,7 +10,7 @@ contract ZestyNFT is ERC721 {
     using SafeMath for uint256;
     uint256 private _tokenCount = 0;
 
-    constructor() ERC721("Zesty Market NFT", "ZESTNFT") {
+    constructor() ERC721("Zesty Market NFT", "ZESTYNFT") {
     }
 
     event Mint(

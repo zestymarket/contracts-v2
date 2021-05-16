@@ -12,7 +12,7 @@ contract ZestyToken is ERC20Capped, Ownable {
     // uint256 public constant initialMint = (10 ** 6) * (10 ** 18);
 
     constructor() 
-        ERC20("Zesty Market Token", "ZEST") 
+        ERC20("Zesty Market Token", "ZESTY") 
         ERC20Capped(maxCap)
     {
         _mint(msg.sender, maxCap);
