@@ -14,7 +14,9 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
     address private _zestyTokenAddress;
     ZestyToken private _zestyToken;
 
-    constructor(address zestyTokenAddress_) ERC721("Zesty Market NFT", "ZESTYNFT") {
+    constructor(address zestyTokenAddress_) 
+        ERC721("Zesty Market NFT", "ZESTYNFT") 
+    {
         _zestyTokenAddress = zestyTokenAddress_;
         _zestyToken = ZestyToken(zestyTokenAddress_);
     }
@@ -38,11 +40,10 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
 
     event ModifyToken (
         uint256 indexed id,
-        address indexed creator,
         string uri
     );
 
-    event setZestyTokenAddress(address zestyTokenAddress);
+    event NewZestyTokenAddress(address zestyTokenAddress);
 
     struct TokenData {
         address creator;
@@ -82,7 +83,7 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
     function setZestyTokenAddress(address zestyTokenAddress_) public onlyOwner {
         _zestyTokenAddress = zestyTokenAddress_;
 
-        emit setZestyTokenAddress(zestyTokenAddress_);
+        emit NewZestyTokenAddress(zestyTokenAddress_);
     }
 
 
@@ -121,7 +122,7 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
         if (!_zestyToken.transferFrom(msg.sender, address(this), _value))
             revert("ZestyNFT: Transfer of ZestyTokens to ZestyNFT failed");
 
-        TokenData storage a = _tokenData(_tokenId);
+        TokenData storage a = _tokenData[_tokenId];
         a.zestyTokenValue = a.zestyTokenValue.add(_value);
 
         emit LockZestyToken(
@@ -136,7 +137,7 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
             "ZestyNFT: Caller is not owner nor approved"
         );
 
-        tokenData storage a = _tokenData[tokenId];
+        TokenData storage a = _tokenData[_tokenId];
         
         delete _tokenData[_tokenId];
         
@@ -154,15 +155,13 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
     function setTokenURI(uint256 _tokenId, string memory _uri) public {
         require(_exists(_tokenId), "ZestyNFT: Token does not exist");
 
-        tokenData storage a = _tokenData[_tokenId];
+        TokenData storage a = _tokenData[_tokenId];
         require(a.creator == msg.sender, "ZestyNFT: Caller is not creator of token");
 
         _setTokenURI(_tokenId, _uri);
 
         emit ModifyToken(
             _tokenId,
-            a.publisher,
-            a.timeCreated,
             _uri
         );
     }

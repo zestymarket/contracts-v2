@@ -24,6 +24,9 @@ contract AuctionTLC_ZEST is Ownable, ZestyVault {
     uint256 private _burnPerc = 100;  // 1.00%
     // uint256 private stakeRedistributionPerc = 400; // TODO: 4.00%
     ZestyToken private _zestyToken;
+    uint8 private constant _FALSE = 1;
+    uint8 private constant _TRUE = 2;
+
 
 
     /** 
@@ -50,26 +53,26 @@ contract AuctionTLC_ZEST is Ownable, ZestyVault {
      */
     struct ZestyNFTSetting {
         uint256 defaultRates;
-        bool anyoneCanCreateAuction;
-        bool displayWithoutApproval;
+        uint8 anyoneCanCreateAuction;
+        uint8 displayWithoutApproval;
         uint256 zestyTokenValue;
     }
 
-    mapping (uint256 => NFTSetting) _zestyNFTSettings; 
+    mapping (uint256 => ZestyNFTSetting) _zestyNFTSettings; 
 
     event ZestyNFTSettingsNew(
         uint256 tokenId,
         uint256 defaultRates,
-        bool anyoneCanCreateAuction,
-        bool displayWithoutApproval,
+        uint8 anyoneCanCreateAuction,
+        uint8 displayWithoutApproval,
         uint256 zestyTokenValue
     );
 
     event ZestyNFTSettingsUpdate(
         uint256 tokenId,
         uint256 defaultRates,
-        bool anyoneCanCreateAuction,
-        bool displayWithoutApproval,
+        uint8 anyoneCanCreateAuction,
+        uint8 displayWithoutApproval,
         uint256 zestyTokenValue
     );
 
@@ -87,8 +90,8 @@ contract AuctionTLC_ZEST is Ownable, ZestyVault {
         view 
         returns (
             uint256 defaultRates,
-            bool anyoneCanCreateAuction,
-            bool displayWithoutApproval,
+            uint8 anyoneCanCreateAuction,
+            uint8 displayWithoutApproval,
             uint256 zestyTokenValue
         ) 
     {
@@ -102,15 +105,15 @@ contract AuctionTLC_ZEST is Ownable, ZestyVault {
     function depositZestyNFT(
         uint256 _tokenId,
         uint256 _defaultRates,
-        bool _anyoneCanCreateAuction,
-        bool displayWithoutApproval
+        uint8 _anyoneCanCreateAuction,
+        uint8 _displayWithoutApproval
     ) public {
         _depositZestyNFT(_tokenId);
         _zestyNFTSettings[_tokenId] = ZestyNFTSetting(
             _defaultRates,
             _anyoneCanCreateAuction,
             _displayWithoutApproval,
-            0,
+            0
         );
 
         emit ZestyNFTSettingsNew(
@@ -131,14 +134,14 @@ contract AuctionTLC_ZEST is Ownable, ZestyVault {
     function updateZestyNFT(
         uint256 _tokenId,
         uint256 _defaultRates,
-        bool _anyoneCanCreateAuction,
-        bool displayWithoutApproval
+        uint8 _anyoneCanCreateAuction,
+        uint8 _displayWithoutApproval
     ) public {
         _zestyNFTSettings[_tokenId] = ZestyNFTSetting(
             _defaultRates,
             _anyoneCanCreateAuction,
             _displayWithoutApproval,
-            0,
+            0
         );
 
         emit ZestyNFTSettingsUpdate(

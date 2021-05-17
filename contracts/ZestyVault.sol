@@ -2,7 +2,7 @@
 pragma solidity ^0.7.0;
 
 import "./openzeppelin/contracts/token/ERC721/ERC721Holder.sol";
-import "./openzeppelin/contracts/utils/Context";
+import "./openzeppelin/contracts/utils/Context.sol";
 import "./ZestyNFT.sol";
 
 /**
@@ -45,25 +45,15 @@ abstract contract ZestyVault is ERC721Holder, Context {
 
         _nftDeposits[_tokenId] = _msgSender();
         _zestyNFT.safeTransferFrom(_msgSender(), address(this), _tokenId);
-
-        emit NewNFTDeposit(
-            _tokenId, 
-            _msgSender()
-        );
     }
 
     function _withdrawZestyNFT(uint256 _tokenId) internal virtual onlyDepositor(_tokenId) {
         delete _nftDeposits[_tokenId];
 
         _zestyNFT.safeTransferFrom(address(this), _msgSender(), _tokenId);
-
-        emit NewNFTWithdrawal(
-            _tokenId,
-            _msgSender()
-        );
     }
 
-    modifier onlyDepositor(_tokenId) {
+    modifier onlyDepositor(uint256 _tokenId) {
         address d = _nftDeposits[_tokenId];
 
         require(

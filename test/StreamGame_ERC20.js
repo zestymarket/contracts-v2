@@ -57,7 +57,7 @@ describe('StreamGame_ERC20', function() {
     expect(data3.currentMessage).to.equal('test2');
 
     let data4 = await zestyToken.balanceOf(signers[0].address);
-    expect(data4).to.equal(ethers.BigNumber.from("99999999999999999999803000")); // total - 200000 + 3000
+    expect(data4).to.equal(ethers.BigNumber.from("6942013378007999999999999803000")); // total - 200000 + 3000
   });
 
   it('It should prevent donation to a non-existent game', async function() {
