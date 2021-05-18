@@ -82,6 +82,7 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
     // This will cause a problem with the ERC20 balances denoted by zestyTokenValue
     function setZestyTokenAddress(address zestyTokenAddress_) public onlyOwner {
         _zestyTokenAddress = zestyTokenAddress_;
+        _zestyToken = ZestyToken(zestyTokenAddress_);
 
         emit NewZestyTokenAddress(zestyTokenAddress_);
     }

@@ -40,6 +40,7 @@ describe('ZestyDice_ETH', function() {
     expect(data2.currentDonor).to.equal(signers[2].address);
     expect(data2.totalDonations).to.equal(ethers.BigNumber.from(3000));
     expect(data2.currentMessage).to.equal('test2');
+    let currentDiceRoll = data2.currentDiceRoll;
 
     // Withdraw
     await zestyDice.connect(signers[3]).withdraw(ethers.BigNumber.from(1));
@@ -48,9 +49,10 @@ describe('ZestyDice_ETH', function() {
     expect(data3.currentDonor).to.equal(signers[2].address);
     expect(data3.totalDonations).to.equal(ethers.BigNumber.from(0));
     expect(data3.currentMessage).to.equal('test2');
+    expect(data3.currentDiceRoll).to.equal(currentDiceRoll);
 
     let balance = await provider.getBalance(signers[0].address);
-    expect(balance).to.equal(ethers.BigNumber.from("9999905376808000006000"));
+    expect(balance).to.equal(ethers.BigNumber.from("9999905273800000006000"));
   });
 
   it('It should prevent donation to a non-existent game', async function() {

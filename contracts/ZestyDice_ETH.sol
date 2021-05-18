@@ -10,6 +10,7 @@ contract ZestyDice_ETH is Context {
     using SafeMath for uint256;
     address private _erc20Address;
     uint256 private _gameCount = 0;
+    uint256 private _nonce = 0;
 
     constructor() {}
 
@@ -99,8 +100,11 @@ contract ZestyDice_ETH is Context {
         g.currentDiceRoll = uint8(uint(keccak256(abi.encodePacked(
             block.difficulty,
             block.timestamp,
+            _nonce,
             g.currentDiceRoll
         ))) % 6);
+
+        _nonce = _nonce.add(1);
 
         emit GameStateUpdate(
             _gameId,
