@@ -71,6 +71,17 @@ Matic: 0x3943C890D2ff687714358006DECA47B8809bF34D
 
 **Specifications**
 
+## ZestyDice_ETH.sol
+ZestyDice_ETH is an extension of StreamGame but focused on dice games on stream.
+Like StreamGame_ETH it allows the streamer to receive donations while streaming.
+
+**Addresses**
+```
+Rinkeby: 0x308529F5A5aCCe53415A2a279175db6Be869439E
+Matic: 0x40eFB3a83897fE06b6b3B339dB878C1ee4620788
+```
+
+
 
 ## AuctionHTLC_ZEST.sol
 **Specifications**
