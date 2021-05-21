@@ -18,3 +18,88 @@
     event NewNFTWithdrawal(
         uint256 indexed tokenId
     );
+
+
+// Token wrapping
+contract ERC20Wrapper is ERC20, ERC1155Receiver {
+    uint256 public tokenId;
+    IShareToken public shareToken;
+    IERC20 public cash;
+    address public augurFoundry;
+
+    /**
+     * @dev sets values for
+     * @param _augurFoundry A trusted factory contract so that users can wrap multiple tokens in one
+     * transaction without giving individual approvals
+     * @param _shareToken address of shareToken for which this wrapper is for
+     * @param _cash DAI
+     * @param _tokenId id of market outcome this wrapper is for
+     * @param _name a descriptive name mentioning market and outcome
+     * @param _symbol symbol
+     * @param _decimals decimals
+     */
+    constructor(
+        address _augurFoundry,
+        IShareToken _shareToken,
+        IERC20 _cash,
+        uint256 _tokenId,
+        string memory _name,
+        string memory _symbol,
+        uint8 _decimals
+    ) public ERC20(_name, _symbol) {
+        _setupDecimals(_decimals);
+        augurFoundry = _augurFoundry;
+        tokenId = _tokenId;
+        shareToken = _shareToken;
+        cash = _cash;
+    }
+
+    /**@dev A function that gets ERC1155s and mints ERC20s
+     * Requirements:
+     *
+     * - if the msg.sender is not augurFoundry then it needs to have given setApprovalForAll
+     *  to this contract (if the msg.sender is augur foundry then we trust it and know that
+     *  it would have transferred the ERC1155s to this contract before calling it)
+     * @param _account account the newly minted ERC20s will go to
+     * @param _amount amount of tokens to be wrapped
+     */
+    function wrapTokens(address _account, uint256 _amount) public {
+        if (msg.sender != augurFoundry) {
+            shareToken.safeTransferFrom(
+                msg.sender,
+                address(this),
+                tokenId,
+                _amount,
+                ""
+            );
+        }
+        _mint(_account, _amount);
+    }
+
+    /**@dev A function that burns ERC20s and gives back ERC1155s
+     * Requirements:
+     *
+     * - if the msg.sender is not augurFoundry or _account then the caller must have allowance for ``_account``'s tokens of at least
+     * `amount`.
+     * - if the market has finalized then claim() function should be called.
+     * @param _account account the newly minted ERC20s will go to
+     * @param _amount amount of tokens to be unwrapped
+     */
+    function unWrapTokens(address _account, uint256 _amount) public {
+        if (msg.sender != _account && msg.sender != augurFoundry) {
+            uint256 decreasedAllowance = allowance(_account, msg.sender).sub(
+                _amount,
+                "ERC20: burn amount exceeds allowance"
+            );
+            _approve(_account, msg.sender, decreasedAllowance);
+        }
+        _burn(_account, _amount);
+
+        shareToken.safeTransferFrom(
+            address(this),
+            _account,
+            tokenId,
+            _amount,
+            ""
+        );
+    }

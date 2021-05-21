@@ -21,6 +21,9 @@ abstract contract ZestyVault is ERC721Holder, Context {
 
     mapping (uint256 => address) private _nftDeposits;
 
+    event DepositZestyNFT(uint256 indexed tokenId, address depositor);
+    event WithdrawZestyNFT(uint256 indexed tokenId);
+
     /*
      * Getter functions
      */
@@ -45,19 +48,21 @@ abstract contract ZestyVault is ERC721Holder, Context {
 
         _nftDeposits[_tokenId] = _msgSender();
         _zestyNFT.safeTransferFrom(_msgSender(), address(this), _tokenId);
+
+        emit DepositZestyNFT(_tokenId, _msgSender());
     }
 
     function _withdrawZestyNFT(uint256 _tokenId) internal virtual onlyDepositor(_tokenId) {
         delete _nftDeposits[_tokenId];
 
         _zestyNFT.safeTransferFrom(address(this), _msgSender(), _tokenId);
+
+        emit WithdrawZestyNFT(_tokenId);
     }
 
     modifier onlyDepositor(uint256 _tokenId) {
-        address d = _nftDeposits[_tokenId];
-
         require(
-            d == _msgSender(),
+            getDepositor(_tokenId) == _msgSender(),
             "ZestyVault: Cannot withdraw as caller did not deposit the ZestyNFT"
         );
         _;
