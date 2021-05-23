@@ -8,20 +8,19 @@ import "./openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./ZestyVault.sol";
 
 /**
- * @title Auction and Timelock Contract for Adslots using ERC20
+ * @title Zesty Market V1 using ERC20
  * @author Zesty Market
  * @notice 
  *   Deposit ZestyNFTs for Adslots Auctions and Fulfillment.
- *   Validation isn't provided in this specification.
- *   Seller fraud is possible. 
  *   Primary use-case of the contract is to experiment on UX flow and value transfer.
  */
-contract AuctionTLC_ERC20 is Ownable, ZestyVault {
+contract ZestyMarket_V1 is Ownable, ZestyVault {
     using SafeMath for uint256;
     using SafeMath for uint32;
 
     address private _erc20Address;
-    uint256 private _auctionCount = 0;
+    uint256 private _buyerOfferCount = 1; // use 0 for empty value
+    uint256 private _sellerOfferCount = 1; // use 0 for empty value
     uint256 private _contractCount = 0;
     uint8 private constant _FALSE = 1;
     uint8 private constant _TRUE = 2;
@@ -40,33 +39,27 @@ contract AuctionTLC_ERC20 is Ownable, ZestyVault {
         _erc20Address = erc20Address_;
     }
     
-    /**
-     * @dev ZestyNFTSetting struct stores addtional information out of ZestyVault
-     * @param defaultRates Default cost in ERC20 token per second for a declared adslot
-     */
-    struct ZestyNFTSetting {
-        uint8 displayWithoutApproval;
+    struct SellerNFTSetting {
+        address seller;
+        uint8 requireApproval;
     }
+    mapping (uint256 => SellerNFTSetting) private _sellerNFTSettings; 
 
-    mapping (uint256 => uint8) private _displayWithoutApproval; 
+    event SellerNFTDeposit(uint256 tokenId, address seller, uint8 requireApproval);
+    event SellerNFTUpdate(uint256 tokenId, uint8 requireApproval);
+    event SellerNFTWithdraw(uint256 tokenId);
 
-    event ZestyNFTDeposit(
-        uint256 tokenId,
-        address depositor,
-        uint8 displayWithoutApproval
-    );
+    struct BuyerNFTSetting {
+        address buyer;
+        uint8 requireApproval
+    }
+    mapping (uint256 => BuyerNFTSetting) private _buyerNFTSettings;
 
-    event ZestyNFTUpdate(
-        uint256 tokenId,
-        uint8 displayWithoutApproval
-    );
+    event BuyerNFTDeposit(uint256 tokenId, address buyer, uint8 requireApproval);
+    event BuyerNFTUpdate(uint256 tokenId, uint8 requireApproval);
+    event BuyerNFTWithdraw(uint256 tokenId);
 
-    event ZestyNFTWithdraw(uint256 tokenId);
-
-    /**
-     * Auction details
-     */
-    struct Auction {
+    struct SellerAuction {
         uint256 tokenId;
         uint256 auctionTimeStart;
         uint256 auctionTimeEnd;
@@ -74,23 +67,21 @@ contract AuctionTLC_ERC20 is Ownable, ZestyVault {
         uint256 contractTimeEnd;
         uint256 priceStart;
         uint256 priceEnd;
-        address buyer;  // default 0x0 if buyer is not 0x0 means the auction is complete
-        uint8 cancelled
+        uint256 buyerOffer;
+        uint8 buyerOfferApproved;
+        uint8 cancelled;
     }
 
-    mapping (uint256 => Auction) private _auctions; 
+    mapping (uint256 => SellerAuction) private _sellerAuctions; 
 
-    event AuctionCreate(
-        uint256 indexed auctionId,
-        uint256 tokenId,
-        uint256 auctionTimeStart,
-        uint256 auctionTimeEnd,
-        uint256 contractTimeStart,
-        uint256 contractTimeEnd,
-        uint256 priceStart
-    );
-    event AuctionCompleted(uint256 indexed auctionId, uint256 priceEnd, address buyer);
-    event AuctionCancelled(uint256 indexed auctionId);
+    struct BuyerCampaign {
+        uint256 tokenId;
+        uint256 value;
+        uint256[] sellerOfferList;
+        uint8 cancelled;
+        uint256[] approvedList;
+    }
+    mapping (uint256 => BuyerCampaign) private _buyerCampaigns;
 
     struct Contract {
         uint256 auctionId;
@@ -108,22 +99,8 @@ contract AuctionTLC_ERC20 is Ownable, ZestyVault {
     }
 
 
-    /*
-     * Getter functions
-     */
     function getZestyTokenAddress() public view returns (address) {
         return _zestyTokenAddress;
-    }
-
-    function getZestyNFTSettings(uint256 _tokenId) 
-        public 
-        view 
-        returns (
-            uint8 displayWithoutApproval
-        ) 
-    {
-        ZestyNFTSetting storage n = _zestyNFTSettings[_tokenId];
-        displayWithoutApproval = n.displayWithoutApproval;
     }
 
     function depositZestyNFT(
