@@ -104,11 +104,11 @@ abstract contract ZestyVault is ERC721Holder, Context {
         _;
     }
 
-    modifier onlyOperator(address _depositor, uint256 _tokenId) {
-        require(
-            isOperatorFor(_depositor, _tokenId, _msgSender()),
-            "ZestyVault: Not operator"
-        );
-        _;
-    }
+    // modifier onlyOperator(address _depositor, uint256 _tokenId) {
+    //     require(
+    //         isOperatorFor(_depositor, _tokenId, _msgSender()),
+    //         "ZestyVault: Not operator"
+    //     );
+    //     _;
+    // }
 }
