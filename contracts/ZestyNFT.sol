@@ -8,7 +8,7 @@ import "./openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./openzeppelin/contracts/access/Ownable.sol";
 import "./ZestyToken.sol";
 
-contract ZestyNFT is ERC1155, Ownable, ReentrancyGuard { 
+contract ZestyNFT is ERC721, Ownable, ReentrancyGuard { 
     using SafeMath for uint256;
     uint256 private _tokenCount = 0;
     address private _zestyTokenAddress;
