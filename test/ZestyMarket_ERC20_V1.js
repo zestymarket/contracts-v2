@@ -26,6 +26,8 @@ describe('ZestyMarket_ERC20_V1', function() {
 
     await zestyNFT.deployed();
     await zestyNFT.mint('testUri');
+    await zestyNFT.mint('testUri1');
+    await zestyNFT.mint('testUri2');
     await zestyNFT.approve(zestyMarket.address, 0);
     await zestyToken.approve(zestyMarket.address, 100000000);
     await zestyToken.transfer(signers[1].address, 100000);
@@ -77,6 +79,40 @@ describe('ZestyMarket_ERC20_V1', function() {
       100
     );
 
-    await expect(zestyMarket.connect(signers[1]).sellerNFTWithdraw(0)).to.be.reverted;
-  })
+    await expect(zestyMarket.sellerNFTWithdraw(0)).to.be.reverted;
+  });
+
+  it('It should allow a seller to withdraw an NFT once an auction is cancelled', async function() {
+    await zestyMarket.sellerNFTDeposit(0, 1);
+    let data = await zestyMarket.getSellerNFTSetting(0);
+    expect(data.tokenId).to.equal(0);
+    expect(data.seller).to.equal(signers[0].address);
+    expect(data.autoApprove).to.equal(1);
+    expect(data.inProgressCount).to.equal(0);
+
+    await zestyMarket.sellerAuctionCreate(
+      0,
+      timeNow + 100,
+      timeNow + 10000,
+      timeNow + 101,
+      timeNow + 10001,
+      100
+    );
+
+    await expect(zestyMarket.sellerNFTWithdraw(0)).to.be.reverted;
+
+    await expect(zestyMarket.sellerAuctionCancel(0)).to.be.reverted;
+    await zestyMarket.sellerAuctionCancel(1);
+    
+    await zestyMarket.sellerNFTWithdraw(0);
+    data = await zestyMarket.getSellerNFTSetting(0);
+    expect(data.tokenId).to.equal(0);
+    expect(data.seller).to.equal(ethers.constants.AddressZero);
+    expect(data.autoApprove).to.equal(0);
+    expect(data.inProgressCount).to.equal(0);
+  });
+
+  it('It should allow a seller to approve the ad if autoApprove is not enabled', async function() {
+
+  });
 });
