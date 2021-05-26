@@ -137,6 +137,35 @@ contract ZestyMarket_V1 is Ownable, ZestyVault {
         return rescalePriceStart.sub(gradient.mul(timePassed)).div(100000);
     }
 
+    function getSellerAuction(uint256 _sellerAuctionId) 
+        public 
+        view 
+        returns (
+            address seller,
+            uint256 tokenId,
+            uint256 auctionTimeStart,
+            uint256 auctionTimeEnd,
+            uint256 contractTimeStart,
+            uint256 contractTimeEnd,
+            uint256 priceStart,
+            uint256 priceEnd,
+            uint256 buyerCampaign,
+            uint8 buyerCampaignApproved
+        )
+    {
+        SellerAuction storage s = _sellerAuctions[_sellerAuctionId];
+        seller = s.seller;
+        tokenId = s.tokenId;
+        auctionTimeStart = s.auctionTimeStart;
+        auctionTimeEnd = s.auctionTimeEnd;
+        contractTimeStart = s.contractTimeStart;
+        contractTimeEnd = s.contractTimeEnd;
+        priceStart = s.priceStart;
+        priceEnd = s.priceEnd;
+        buyerCampaign = s.buyerCampaign;
+        buyerCampaignApproved = s.buyerCampaignApproved;
+    }
+
     /* 
      * Buyer logic
      */
@@ -336,6 +365,8 @@ contract ZestyMarket_V1 is Ownable, ZestyVault {
     }
     function _sellerAuctionCancel(uint256 _sellerAuctionId) private {
         SellerAuction storage s = _sellerAuctions[_sellerAuctionId];
+        require(s.seller != address(0), "ZestyMarket_ERC20_V1: Seller Auction is invalid");
+        require(s.buyerCampaign == 0, "ZestyMarket_ERC20_V1: Reject campaign before cancelling");
         require(s.seller == msg.sender, "ZestyMarket_ERC20_V1: Not seller");
         delete _sellerAuctions[_sellerAuctionId];
         emit SellerAuctionCancel(_sellerAuctionId);
@@ -354,6 +385,7 @@ contract ZestyMarket_V1 is Ownable, ZestyVault {
     function _sellerAuctionBid(uint256 _sellerAuctionId, uint256 _buyerCampaignId) private {
         SellerAuction storage s = _sellerAuctions[_sellerAuctionId];
         BuyerCampaign storage b = _buyerCampaigns[_buyerCampaignId];
+        require(s.seller != address(0), "ZestyMarket_ERC20_V1: Seller Auction is invalid");
         require(s.seller != msg.sender, "ZestyMarket_ERC20_V1: Can't bid on own auction");
         require(s.buyerCampaign == 0, "ZestyMarket_ERC20_V1: Already has a bid");
         require(b.buyer != address(0), "ZestyMarket_ERC20_V1: Buyer Campaign is invalid");
@@ -411,6 +443,7 @@ contract ZestyMarket_V1 is Ownable, ZestyVault {
 
     function _sellerAuctionApprove(uint256 _sellerAuctionId) private {
         SellerAuction storage s = _sellerAuctions[_sellerAuctionId];
+        require(s.seller != address(0), "ZestyMarket_ERC20_V1: Seller Auction is invalid");
         require(s.seller == msg.sender, "ZestyMarket_ERC20_V1: Not Seller");
         require(s.buyerCampaign != 0, "ZestyMarket_ERC20_V1: Does not have a bid");
         require(s.buyerCampaignApproved == _FALSE, "ZestyMarket_ERC20_V1: Already approved");
@@ -452,6 +485,7 @@ contract ZestyMarket_V1 is Ownable, ZestyVault {
 
     function _sellerAuctionReject(uint256 _sellerAuctionId) private {
         SellerAuction storage s = _sellerAuctions[_sellerAuctionId];
+        require(s.seller != address(0), "ZestyMarket_ERC20_V1: Seller Auction is invalid");
         require(s.seller == msg.sender, "ZestyMarket_ERC20_V1: Not Seller");
         require(s.buyerCampaign != 0, "ZestyMarket_ERC20_V1: Does not have a bid");
         require(s.buyerCampaignApproved == _FALSE, "ZestyMarket_ERC20_V1: Already approved");
@@ -478,15 +512,13 @@ contract ZestyMarket_V1 is Ownable, ZestyVault {
         }
     }
 
-    // function _buyerCampaignCreate() public {
-
-    // }
-
     function _contractWithdraw(uint256 _contractId) private {
         Contract storage c = _contracts[_contractId];
         SellerAuction storage s = _sellerAuctions[c.sellerAuctionId];
 
+        require(s.seller != address(0), "ZestyMarket_ERC20_V1: Seller Auction is invalid");
         require(s.seller == msg.sender, "ZestyMarket_ERC20_V1: Not Seller");
+        require(c.sellerAuctionId != 0 || c.buyerCampaignId != 0, "ZestyMarket_ERC20_V1: Invalid Contract");
         require(block.timestamp > c.contractTimeEnd, "ZestyMarket_ERC20_V1: Contract has not ended");
         require(c.withdrawn == _FALSE, "ZestyMarket_ERC20_V1: Already withdrawn");
 
