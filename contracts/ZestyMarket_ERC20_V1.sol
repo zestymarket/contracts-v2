@@ -166,6 +166,40 @@ contract ZestyMarket_V1 is Ownable, ZestyVault {
         buyerCampaignApproved = s.buyerCampaignApproved;
     }
 
+    function getBuyerCampaign(uint256 _buyerCampaignId)
+        public
+        view
+        returns (
+            address buyer,
+            string uri
+        )
+    {
+        BuyerCampaign storage b = _buyerCampaign[_buyerCampaignId];
+        buyer = b.buyer;
+        uri = b.uri;
+    }
+
+    function getContract(uint256 _contractId)
+        public
+        view
+        returns (
+            uint256 sellerAuctionId,
+            uint256 buyerCampaignId,
+            uint256 contractTimeStart,
+            uint256 contractTimeEnd,
+            uint256 contractValue,
+            uint8 withdrawn
+        )
+    {
+        Contract storage c = _Contract[_contractId];
+        sellerAuctionId = c.sellerAuctionId;
+        buyerCampaignId = c.buyerCampaignId;
+        contractTimeStart = c.contractTimeStart;
+        contractTimeEnd = c.contractTimeEnd;
+        contractValue = c.contractValue;
+        withdrawn = c.withdrawn;
+    }
+
     /* 
      * Buyer logic
      */
