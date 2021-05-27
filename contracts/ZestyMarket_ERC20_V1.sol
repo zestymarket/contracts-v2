@@ -7,7 +7,6 @@ import "./openzeppelin/contracts/access/Ownable.sol";
 import "./openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./openzeppelin/contracts/utils/EnumerableSet.sol";
 import "./ZestyVault.sol";
-import "hardhat/console.sol";
 
 /**
  * @title Zesty Market V1 using ERC20
