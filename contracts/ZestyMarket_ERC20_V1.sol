@@ -7,6 +7,7 @@ import "./openzeppelin/contracts/access/Ownable.sol";
 import "./openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./openzeppelin/contracts/utils/EnumerableSet.sol";
 import "./ZestyVault.sol";
+import "hardhat/console.sol";
 
 /**
  * @title Zesty Market V1 using ERC20
@@ -23,7 +24,7 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault {
     address private _erc20Address;
     uint256 private _buyerCampaignCount = 1; // 0 is used null values
     uint256 private _sellerAuctionCount = 1; // 0 is used for null values
-    uint256 private _contractCount = 0;
+    uint256 private _contractCount = 1;
     uint8 private constant _FALSE = 1;
     uint8 private constant _TRUE = 2;
 
@@ -454,10 +455,12 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault {
     function _sellerAuctionBid(uint256 _sellerAuctionId, uint256 _buyerCampaignId) private {
         SellerAuction storage s = _sellerAuctions[_sellerAuctionId];
         BuyerCampaign storage b = _buyerCampaigns[_buyerCampaignId];
+        require(block.timestamp > s.auctionTimeStart, "ZestyMarket_ERC20_V1: Auction has yet to start");
         require(s.seller != address(0), "ZestyMarket_ERC20_V1: Seller Auction is invalid");
         require(s.seller != msg.sender, "ZestyMarket_ERC20_V1: Can't bid on own auction");
         require(s.buyerCampaign == 0, "ZestyMarket_ERC20_V1: Already has a bid");
         require(b.buyer != address(0), "ZestyMarket_ERC20_V1: Buyer Campaign is invalid");
+        require(b.buyer == msg.sender, "ZestyMarket_ERC20_V1: Buyer Campaign does not belong to caller");
 
         s.buyerCampaign = _buyerCampaignId;
 
@@ -517,7 +520,7 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault {
         require(s.buyerCampaign != 0, "ZestyMarket_ERC20_V1: Does not have a bid");
         require(s.buyerCampaignApproved == _FALSE, "ZestyMarket_ERC20_V1: Already approved");
 
-        s.buyerCampaignApproved == _TRUE;
+        s.buyerCampaignApproved = _TRUE;
         _contracts[_contractCount] = Contract(
             _sellerAuctionId,
             s.buyerCampaign,
@@ -564,7 +567,7 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault {
         s.priceEnd = 0;
         s.buyerCampaign = 0;
 
-        if(!IERC20(_erc20Address).transferFrom(address(this), b.buyer, priceEnd)) {
+        if(!IERC20(_erc20Address).transfer(b.buyer, priceEnd)) {
             revert("Transfer of ERC20 failed, check if sufficient allowance is provided");
         }
 
@@ -592,7 +595,7 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault {
         require(c.withdrawn == _FALSE, "ZestyMarket_ERC20_V1: Already withdrawn");
 
         c.withdrawn = _TRUE;
-        if(!IERC20(_erc20Address).transferFrom(address(this), s.seller, c.contractValue)) {
+        if(!IERC20(_erc20Address).transfer(s.seller, c.contractValue)) {
             revert("Transfer of ERC20 failed, check if sufficient allowance is provided");
         }
 
