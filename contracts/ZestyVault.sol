@@ -21,12 +21,12 @@ abstract contract ZestyVault is ERC721Holder, Context {
     }
 
     mapping (uint256 => address) private _nftDeposits;
-    // mapping (address => mapping (uint256 => mapping (address => bool))) _nftDepositOperators;
+    mapping (address => address) private _nftDepositOperators;
 
     event DepositZestyNFT(uint256 indexed tokenId, address depositor);
     event WithdrawZestyNFT(uint256 indexed tokenId);
-    // event AuthorizeOperator(uint256 indexed tokenId, address operator, address depositor);
-    // event RevokeOperator(uint256 indexed tokenId, address operator, address depositor);
+    event AuthorizeOperator(address indexed depositor, address operator);
+    event RevokeOperator(address indexed depositor, address operator);
 
     /*
      * Getter functions
@@ -40,37 +40,36 @@ abstract contract ZestyVault is ERC721Holder, Context {
         return _nftDeposits[_tokenId];
     }
 
-    // function isOperatorFor(
-    //     uint256 _depositor, 
-    //     uint256 _tokenId, 
-    //     address _operator
-    // ) 
-    //     public 
-    //     virtual 
-    //     view 
-    //     returns (bool) 
-    // {
-    //     return _nftDepositOperators[_depositor][_tokenId][_operator];
-    // }
+    function isDepositor(uint256 _tokenId) public virtual view returns (bool) {
+        return _msgSender() == getDepositor(_tokenId);
+    }
+
+    function getOperator(address _depositor) public virtual view returns (address) {
+        return _nftDepositOperators[_depositor];
+    }
+
+    function isOperator(address _depositor, address _operator) public virtual view returns (bool) {
+        return _nftDepositOperators[_depositor] == _operator;
+    }
 
     /*
      * Operator functionality
      */
-    // function authorizeOperator(uint256 _tokenId, address _operator) public virtual override onlyDepositor(_tokenId) {
-    //     require(_msgSender() != _operator, "ZestyVault: authorizing self as operator");
+    function authorizeOperator(address _operator) public virtual {
+        require(_msgSender() != _operator, "ZestyVault: authorizing self as operator");
 
-    //     _nftDepositOperators[_msgSender()][_tokenId][operator] = true;
+        _nftDepositOperators[_msgSender()] = _operator;
 
-    //     emit AuthorizeOperator(_tokenId, operator, _msgSender());
-    // }
+        emit AuthorizeOperator(_msgSender(), _operator);
+    }
 
-    // function revokeOperator(address operator) public virtual override onlyDepositor(_tokenId) {
-    //     require(operator != _msgSender(), "ZestyVault: revoking self as operator");
+    function revokeOperator(address _operator) public virtual {
+        require(_msgSender() != _operator, "ZestyVault: revoking self as operator");
 
-    //     delete _nftDepositOperators[_msgSender()][_tokenId][operator];
+        delete _nftDepositOperators[_msgSender()];
 
-    //     emit RevokeOperator(_tokenId, operator, _msgSender());
-    // }
+        emit RevokeOperator(_msgSender(), _operator);
+    }
 
     /*
      * NFT Deposit and Withdrawal Functions
@@ -104,11 +103,20 @@ abstract contract ZestyVault is ERC721Holder, Context {
         _;
     }
 
-    // modifier onlyOperator(address _depositor, uint256 _tokenId) {
-    //     require(
-    //         isOperatorFor(_depositor, _tokenId, _msgSender()),
-    //         "ZestyVault: Not operator"
-    //     );
-    //     _;
-    // }
+    modifier onlyOperator(uint256 _tokenId) {
+        require(
+            getOperator(getDepositor(_tokenId)) == _msgSender(),
+            "ZestyVault: Not operator"
+        );
+        _;
+    }
+
+    modifier onlyDepositorOrOperator(uint256 _tokenId) {
+        require(
+            getDepositor(_tokenId) == _msgSender() 
+            || getOperator(getDepositor(_tokenId)) == _msgSender(),
+            "ZestyVault: Not depositor or operator"
+        );
+        _;
+    }
 }
