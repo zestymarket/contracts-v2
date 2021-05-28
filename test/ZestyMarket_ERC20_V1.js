@@ -10,7 +10,6 @@ describe('ZestyMarket_ERC20_V1', function() {
   beforeEach(async () => {
     signers = await ethers.getSigners();
     timeNow = await time.latest();
-    timeNow 
     timeNow = timeNow.toNumber();
 
     let ZestyToken = await ethers.getContractFactory('ZestyToken');

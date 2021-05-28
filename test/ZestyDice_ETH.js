@@ -16,6 +16,8 @@ describe('ZestyDice_ETH', function() {
   });
 
   it('It should create a game, allow someone to donate, and allow creator to withdraw', async function() {
+    let oldbalance = await provider.getBalance(signers[0].address);
+
     // Start Game
     await zestyDice.start();
 
@@ -52,7 +54,7 @@ describe('ZestyDice_ETH', function() {
     expect(data3.currentDiceRoll).to.equal(currentDiceRoll);
 
     let balance = await provider.getBalance(signers[0].address);
-    expect(balance).to.equal(ethers.BigNumber.from("9999991592560000003000"));
+    expect(balance.mod(10000)).to.equal(oldbalance.add(ethers.BigNumber.from(3000)).mod(10000));
   });
 
   it('It should prevent donation to a non-existent game', async function() {
