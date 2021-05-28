@@ -3,7 +3,6 @@ pragma solidity ^0.7.0;
 
 import "./openzeppelin/contracts/token/ERC721/ERC721Holder.sol";
 import "./openzeppelin/contracts/utils/Context.sol";
-import "./openzeppelin/contracts/utils/EnumerableSet.sol";
 import "./ZestyNFT.sol";
 
 /**

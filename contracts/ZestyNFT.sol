@@ -6,6 +6,7 @@ import "./openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "./openzeppelin/contracts/math/SafeMath.sol";
 import "./openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./openzeppelin/contracts/access/Ownable.sol";
+import "./openzeppelin/contracts/utils/Context.sol";
 import "./ZestyToken.sol";
 
 contract ZestyNFT is ERC721, Ownable, ReentrancyGuard { 
@@ -63,7 +64,7 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
             string memory uri
         ) 
     {
-        require(_exists(tokenId), "Token does not exist");
+        require(_exists(tokenId), "ZestyNFT: Token does not exist");
         TokenData storage a = _tokenData[tokenId];
         string memory _uri = tokenURI(tokenId);
 
@@ -93,20 +94,20 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
         uint256 _timeNow = block.timestamp;
 
         // mint token
-        _safeMint(msg.sender, _tokenCount);
+        _safeMint(_msgSender(), _tokenCount);
 
         // set uri
         _setTokenURI(_tokenCount, _uri);
 
         _tokenData[_tokenCount] = TokenData(
-            msg.sender,
+            _msgSender(),
             _timeNow,
             0
         );
 
         emit Mint(
             _tokenCount,
-            msg.sender,
+            _msgSender(),
             _timeNow,
             _uri
         );
@@ -120,7 +121,7 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
             "ZestyNFT: Unable to lock ZestyTokens as zestyToken is not ready"
         );
 
-        if (!_zestyToken.transferFrom(msg.sender, address(this), _value))
+        if (!_zestyToken.transferFrom(_msgSender(), address(this), _value))
             revert("ZestyNFT: Transfer of ZestyTokens to ZestyNFT failed");
 
         TokenData storage a = _tokenData[_tokenId];
@@ -137,15 +138,16 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
             _isApprovedOrOwner(_msgSender(), _tokenId), 
             "ZestyNFT: Caller is not owner nor approved"
         );
-
         TokenData storage a = _tokenData[_tokenId];
-        
+        uint256 zestyTokenValue = a.zestyTokenValue;
         delete _tokenData[_tokenId];
-        
-        _burn(_tokenId);
 
-        if (!_zestyToken.transferFrom(address(this), msg.sender, a.zestyTokenValue))
-            revert("ZestyNFT: Transfer of ZestyTokens from ZestyNFT to caller failed");
+        if(_zestyTokenAddress != address(0)) {
+            if (!_zestyToken.transfer(_msgSender(), zestyTokenValue))
+                revert("ZestyNFT: Transfer of ZestyTokens from ZestyNFT to caller failed");
+        }
+
+        _burn(_tokenId);
 
         emit Burn(
             _tokenId,
@@ -157,7 +159,7 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
         require(_exists(_tokenId), "ZestyNFT: Token does not exist");
 
         TokenData storage a = _tokenData[_tokenId];
-        require(a.creator == msg.sender, "ZestyNFT: Caller is not creator of token");
+        require(a.creator == _msgSender(), "ZestyNFT: Caller is not creator of token");
 
         _setTokenURI(_tokenId, _uri);
 

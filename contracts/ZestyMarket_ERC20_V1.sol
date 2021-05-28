@@ -5,7 +5,7 @@ pragma experimental ABIEncoderV2;
 import "./openzeppelin/contracts/math/SafeMath.sol";
 import "./openzeppelin/contracts/access/Ownable.sol";
 import "./openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./openzeppelin/contracts/utils/EnumerableSet.sol";
+import "./openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./ZestyVault.sol";
 
 /**
@@ -16,7 +16,7 @@ import "./ZestyVault.sol";
  *   Primary use-case of the contract is to experiment on UX flow and value transfer.
  *   No validation using shamir secret shares is done in this version
  */
-contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault {
+contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeMath for uint32;
 
@@ -248,7 +248,10 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault {
     function sellerNFTDeposit(
         uint256 _tokenId,
         uint8 _autoApprove
-    ) public {
+    ) 
+        public 
+        nonReentrant
+    {
         require(
             _autoApprove == _TRUE || _autoApprove == _FALSE,
             "ZestyMarket_ERC20_V1: _autoApprove must be uint8 1 (FALSE) or 2 (TRUE)"
@@ -269,7 +272,7 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault {
         );
     }
 
-    function sellerNFTWithdraw(uint256 _tokenId) public onlyDepositor(_tokenId) {
+    function sellerNFTWithdraw(uint256 _tokenId) public onlyDepositor(_tokenId) nonReentrant {
         SellerNFTSetting storage s = _sellerNFTSettings[_tokenId];
         require(s.inProgressCount == 0, "ZestyMarket_ERC20_V1: Auction in progress cannot withdraw");
         _withdrawZestyNFT(_tokenId);
@@ -453,7 +456,7 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault {
         }
     }
 
-    function _sellerAuctionBid(uint256 _sellerAuctionId, uint256 _buyerCampaignId) private {
+    function _sellerAuctionBid(uint256 _sellerAuctionId, uint256 _buyerCampaignId) private nonReentrant {
         SellerAuction storage s = _sellerAuctions[_sellerAuctionId];
         BuyerCampaign storage b = _buyerCampaigns[_buyerCampaignId];
         require(block.timestamp > s.auctionTimeStart, "ZestyMarket_ERC20_V1: Auction has yet to start");
@@ -559,7 +562,7 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault {
         }
     }
 
-    function _sellerAuctionReject(uint256 _sellerAuctionId) private {
+    function _sellerAuctionReject(uint256 _sellerAuctionId) private nonReentrant {
         SellerAuction storage s = _sellerAuctions[_sellerAuctionId];
         require(s.seller != address(0), "ZestyMarket_ERC20_V1: Seller Auction is invalid");
         require(s.seller == msg.sender || isOperator(s.seller, msg.sender), "ZestyMarket_ERC20_V1: Not Seller or operator");
@@ -588,7 +591,7 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault {
         }
     }
 
-    function _contractWithdraw(uint256 _contractId) private {
+    function _contractWithdraw(uint256 _contractId) private nonReentrant {
         Contract storage c = _contracts[_contractId];
         SellerAuction storage s = _sellerAuctions[c.sellerAuctionId];
 

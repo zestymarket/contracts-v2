@@ -49,7 +49,7 @@ describe('StreamGame_ETH', function() {
     expect(data3.currentMessage).to.equal('test2');
 
     let balance = await provider.getBalance(signers[0].address);
-    expect(balance).to.equal(ethers.BigNumber.from("9999927703848000003000"));
+    expect(balance).to.equal(ethers.BigNumber.from("9999992388656000003000"));
   });
 
   it('It should prevent donation to a non-existent game', async function() {

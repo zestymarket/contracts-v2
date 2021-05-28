@@ -7,7 +7,7 @@ import "./openzeppelin/contracts/token/ERC20/ERC20.sol";
 // This ERC-20 contract mints the specified amount of tokens to the contract creator.
 contract ZestyToken is ERC20 {
     using SafeMath for uint256;
-    uint256 public constant maxCap = (6942013378008) * (10 ** 18);
+    uint256 public constant maxCap = (100000000) * (10 ** 18);
 
     constructor() ERC20("Zesty Market Token", "ZESTY") {
         _mint(msg.sender, maxCap);

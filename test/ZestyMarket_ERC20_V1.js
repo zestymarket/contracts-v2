@@ -291,6 +291,9 @@ describe('ZestyMarket_ERC20_V1', function() {
     expect(data.contractValue).to.equal(98);
     expect(data.withdrawn).to.equal(2);
 
+    data = await zestyToken.balanceOf(signers[0].address);
+    expect(data.toString()).to.equal("99999999999999999999700098");
+
     // cannot double withdraw
     await expect(zestyMarket.contractWithdraw(1)).to.be.reverted;
 
@@ -381,6 +384,9 @@ describe('ZestyMarket_ERC20_V1', function() {
     expect(data.contractTimeEnd).to.equal(timeNow + 10001);
     expect(data.contractValue).to.equal(98);
     expect(data.withdrawn).to.equal(2);
+
+    data = await zestyToken.balanceOf(signers[0].address);
+    expect(data.toString()).to.equal("99999999999999999999700098");
 
     // cannot double withdraw
     await expect(zestyMarket.contractWithdraw(1)).to.be.reverted;
@@ -590,7 +596,7 @@ describe('ZestyMarket_ERC20_V1', function() {
     expect(data).to.equal(0);
 
     data = await zestyToken.balanceOf(signers[0].address);
-    expect(data).to.equal(ethers.BigNumber.from('6942013378007999999999999700294'));
+    expect(data).to.equal(ethers.BigNumber.from('99999999999999999999700294'));
 
     // cannot double withdraw
     await expect(zestyMarket.contractWithdrawBatch([1,2,3])).to.be.reverted;
@@ -702,6 +708,9 @@ describe('ZestyMarket_ERC20_V1', function() {
     // allow withdrawal of NFT once process is complete
     await expect(zestyMarket.sellerAuctionCancel([1,2,3])).to.be.reverted;
 
+    data = await zestyToken.balanceOf(signers[0].address);
+    await expect(data.toString()).to.equal("99999999999999999999700294");
+
     await zestyMarket.sellerNFTWithdraw(0);
     data = await zestyMarket.getSellerNFTSetting(0);
     expect(data.tokenId).to.equal(0);
@@ -806,6 +815,9 @@ describe('ZestyMarket_ERC20_V1', function() {
     data = await zestyToken.balanceOf(zestyMarket.address);
     expect(data).to.equal(0);
 
+    data = await zestyToken.balanceOf(signers[0].address);
+    expect(data.toString()).to.equal("99999999999999999999700000");
+
     // allow cancellation and withdrawal of NFT once rejection occured
     await zestyMarket.connect(signers[2]).sellerAuctionCancelBatch([1,2,3]);
     for (let i=1; i<=3; i++) {
@@ -897,6 +909,9 @@ describe('ZestyMarket_ERC20_V1', function() {
     data = await zestyToken.balanceOf(zestyMarket.address);
     expect(data).to.equal(294);
 
+    data = await zestyToken.balanceOf(signers[0].address);
+    expect(data.toString()).to.equal("99999999999999999999700000");
+
     for (let i=1; i<=3; i++) {
       data = await zestyMarket.getContract(i);
       expect(data.sellerAuctionId).to.equal(i);
@@ -927,7 +942,7 @@ describe('ZestyMarket_ERC20_V1', function() {
     expect(data).to.equal(0);
 
     data = await zestyToken.balanceOf(signers[0].address);
-    expect(data).to.equal(ethers.BigNumber.from('6942013378007999999999999700294'));
+    expect(data).to.equal(ethers.BigNumber.from('99999999999999999999700294'));
 
     // cannot double withdraw
     await expect(zestyMarket.connect(signers[2]).contractWithdrawBatch([1,2,3])).to.be.reverted;
@@ -1013,6 +1028,9 @@ describe('ZestyMarket_ERC20_V1', function() {
 
     data = await zestyToken.balanceOf(zestyMarket.address);
     expect(data).to.equal(294);
+
+    data = await zestyToken.balanceOf(signers[0].address);
+    expect(data.toString()).to.equal("99999999999999999999700000");
 
     for (let i=1; i<=3; i++) {
       data = await zestyMarket.getContract(i);
