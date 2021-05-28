@@ -55,8 +55,27 @@ As a Utility token, $ZEST can be used in transactions within Zesty Market.
 ## ZestyNFT.sol
 ZestyNFT is the contract which allows a creator to declare advertising slots that can be subsequently rented out. 
 
-These NFTs can be deposited in the AuctionHTLC contracts for rent. 
-The NFTs would accrue $ZEST upon successful auctions. Creating a price floor for the NFTs which allows the NFTs to serve as collateral or be used for underwriting in future.
+These NFTs can be deposited in the ZestyMarket contracts for rent. 
+The NFTs would accrue $ZEST upon successful auctions. 
+This creates a price floor for the NFTs which allows the NFTs to serve as collateral or be used for underwriting in future.
+
+**Addresses**
+```
+Rinkeby: 0xA63f65d68FDB6a50cfD8D89fB92fF642bB6f4eCe
+```
+
+**Specifications**
+
+## ZestyVault.sol
+ZestyVault is the abstract contract that is inherited by contracts like ZestyMarket to allow for the deposit of ZestyNFTs. Operators can be associated with an address to automate contract interactions.
+
+## ZestyMarket_ERC20_V1.sol
+Zesty Market is the key contract where you can auction out advertising slots as a creator and create advertising campaigns as an advertiser. 
+
+**Addresses**
+```
+Rinkeby: 0x5e750eFA81C8BC3be8f97595d4255A376c1955f7
+```
 
 **Specifications**
 
@@ -80,16 +99,3 @@ Like StreamGame_ETH it allows the streamer to receive donations while streaming.
 Rinkeby: 0x308529F5A5aCCe53415A2a279175db6Be869439E
 Matic: 0x40eFB3a83897fE06b6b3B339dB878C1ee4620788
 ```
-
-
-
-## AuctionHTLC_ZEST.sol
-**Specifications**
-
-## AuctionHTLC_STABLE.sol
-
-## AuctionHTLC_ETH.sol
-
-## Validator.sol
-
-## ZestyDAO.sol
