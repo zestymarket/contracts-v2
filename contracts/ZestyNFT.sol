@@ -157,6 +157,7 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
 
     function setTokenURI(uint256 _tokenId, string memory _uri) public {
         require(_exists(_tokenId), "ZestyNFT: Token does not exist");
+        require(ownerOf(_tokenId) == _msgSender(), "ZestyNFT: Caller not owner");
 
         TokenData storage a = _tokenData[_tokenId];
         require(a.creator == _msgSender(), "ZestyNFT: Caller is not creator of token");

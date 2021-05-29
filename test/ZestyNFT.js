@@ -35,6 +35,26 @@ describe('ZestyNFT', function() {
     await zestyNFT.burn(0);
   });
 
+  it('It should only allow the creator to set URI when in possession of NFT', async function() {
+    await zestyNFT.mint('testURI');
+    let data = await zestyNFT.getTokenData(0);
+    expect(data.creator).to.equal(signers[0].address);
+    expect(data.zestyTokenValue).to.equal(0);
+    expect(data.uri).to.equal('testURI');
+
+    await zestyNFT.setTokenURI(0, 'testURI2');
+    data = await zestyNFT.getTokenData(0);
+    expect(data.creator).to.equal(signers[0].address);
+    expect(data.zestyTokenValue).to.equal(0);
+    expect(data.uri).to.equal('testURI2');
+
+    await expect(zestyNFT.connect(signers[1]).setTokenURI('testURI2')).to.be.reverted;
+
+    await zestyNFT.transferFrom(signers[0].address, signers[1].address, 0);
+    expect(await zestyNFT.ownerOf(0)).to.equal(signers[1].address);
+    await expect(zestyNFT.setTokenURI('testURI2')).to.be.reverted;
+  });
+
   it('It should prevent people from locking tokens if token address is 0x0', async function() {
     // Sanity check to see if everything is working properly
     await zestyNFT.mint('testURI');

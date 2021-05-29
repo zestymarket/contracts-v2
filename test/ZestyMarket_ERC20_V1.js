@@ -103,6 +103,7 @@ describe('ZestyMarket_ERC20_V1', function() {
     expect(data.seller).to.equal(signers[0].address);
     expect(data.autoApprove).to.equal(1);
     expect(data.inProgressCount).to.equal(0);
+    expect(await zestyNFT.ownerOf(0)).to.equal(zestyMarket.address);
 
     await zestyMarket.sellerAuctionCreate(
       0,
@@ -125,6 +126,7 @@ describe('ZestyMarket_ERC20_V1', function() {
     expect(data.seller).to.equal(ethers.constants.AddressZero);
     expect(data.autoApprove).to.equal(0);
     expect(data.inProgressCount).to.equal(0);
+    expect(await zestyNFT.ownerOf(0)).to.equal(signers[0].address);
   });
 
   it('It should allow a seller to reject the ad if autoApprove is disabled', async function() {
