@@ -71,7 +71,7 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault, ReentrancyGuard {
         uint256 contractTimeStart,
         uint256 contractTimeEnd,
         uint256 priceStart,
-        uint256 autoApprove
+        uint8 buyerCampaignApproved
     );
     event SellerAuctionCancel(uint256 indexed sellerAuctionId);
     event SellerAuctionBuyerCampaignNew(
