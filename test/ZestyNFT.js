@@ -83,6 +83,14 @@ describe('ZestyNFT', function() {
     expect(data.uri).to.equal('testURI');
     expect(await zestyToken.balanceOf(zestyNFT.address)).to.equal(1000);
 
+    zestyNFT.lockZestyToken(0, 1000);
+
+    data = await zestyNFT.getTokenData(0);
+    expect(data.creator).to.equal(signers[0].address);
+    expect(data.zestyTokenValue).to.equal(2000);
+    expect(data.uri).to.equal('testURI');
+    expect(await zestyToken.balanceOf(zestyNFT.address)).to.equal(2000);
+
     await zestyNFT.burn(0);
     await expect(zestyNFT.getTokenData(0)).to.be.reverted;
 
