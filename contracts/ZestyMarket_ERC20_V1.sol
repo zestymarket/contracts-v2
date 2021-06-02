@@ -99,7 +99,6 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault, ReentrancyGuard {
         address buyer, 
         string uri
     );
-    event BuyerCampaignCancel(uint256 indexed buyerCampaignId);
 
     struct Contract {
         uint256 sellerAuctionId;
@@ -235,13 +234,6 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault, ReentrancyGuard {
         _buyerCampaignCount = _buyerCampaignCount.add(1);
     }
 
-    function buyerCampaignCancel(uint256 _buyerCampaignId) public {
-        BuyerCampaign storage b = _buyerCampaigns[_buyerCampaignId];
-        require(b.buyer != address(0), "ZestyMarket_ERC20_V!: Buyer Campaign Invalid");
-        require(b.buyer == msg.sender, "ZestyMarket_ERC20_V1: Not buyer");
-        delete _buyerCampaigns[_buyerCampaignId];
-        emit BuyerCampaignCancel(_buyerCampaignId);
-    }
     /* 
      * Seller logic
      */
