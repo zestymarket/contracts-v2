@@ -272,7 +272,7 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault, ReentrancyGuard {
         emit SellerNFTWithdraw(_tokenId);
     }
 
-    function updateZestyNFT(
+    function sellerNFTUpdate(
         uint256 _tokenId,
         uint8 _autoApprove
     ) 
