@@ -61,7 +61,7 @@ This creates a price floor for the NFTs which allows the NFTs to serve as collat
 
 **Addresses**
 ```
-Rinkeby: 0x3a2f0d87881E2024094ed81308a002E26795f869
+Rinkeby: 0x32e413201f8AD8FF476371b40fd185107ca7c4dB
 ```
 
 **Specifications**
@@ -74,7 +74,7 @@ Zesty Market is the key contract where you can auction out advertising slots as 
 
 **Addresses**
 ```
-Rinkeby (USDC Compound): 0x21CBdb0aA00da526c3ae0140afAfcD52b7796EEf
+Rinkeby (USDC Compound): 0xF94EfCe12deEd41D85ecE71bc6E279805Ca106a5
 ```
 
 **Specifications**
