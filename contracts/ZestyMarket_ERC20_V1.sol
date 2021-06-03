@@ -451,7 +451,8 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault, ReentrancyGuard {
     function _sellerAuctionBid(uint256 _sellerAuctionId, uint256 _buyerCampaignId) private nonReentrant {
         SellerAuction storage s = _sellerAuctions[_sellerAuctionId];
         BuyerCampaign storage b = _buyerCampaigns[_buyerCampaignId];
-        require(block.timestamp > s.auctionTimeStart, "ZestyMarket_ERC20_V1: Auction has yet to start");
+        require(block.timestamp >= s.auctionTimeStart, "ZestyMarket_ERC20_V1: Auction has yet to start");
+        require(s.auctionTimeEnd > block.timestamp, "ZestyMarket_ERC20_V1: Auction has ended");
         require(s.seller != address(0), "ZestyMarket_ERC20_V1: Seller Auction is invalid");
         require(s.seller != msg.sender, "ZestyMarket_ERC20_V1: Can't bid on own auction");
         require(s.buyerCampaign == 0, "ZestyMarket_ERC20_V1: Already has a bid");
@@ -464,6 +465,7 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault, ReentrancyGuard {
         s.buyerCampaign = _buyerCampaignId;
 
         uint256 price = getSellerAuctionPrice(_sellerAuctionId);
+        require(price > 0, "ZestyMarket_ERC20_V1: Auction has expired");
         s.priceEnd = price;
 
         if(!IERC20(_erc20Address).transferFrom(b.buyer, address(this), price)) {
