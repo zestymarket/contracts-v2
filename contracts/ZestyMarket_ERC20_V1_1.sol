@@ -601,12 +601,12 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault, ReentrancyGuard {
 
     function _sellerAuctionBuyerCancel(uint256 _sellerAuctionId) private nonReentrant {
         SellerAuction storage s = _sellerAuctions[_sellerAuctionId];
+        BuyerCampaign storage b = _buyerCampaigns[s.buyerCampaign];
         require(s.seller != address(0), "ZestyMarket_ERC20_V1: Seller Auction is invalid");
-        require(s.buyerCampaign.buyer == msg.sender || isOperator(s.buyer, msg.sender), "ZestyMarket_ERC20_V1: Not buyer or operator");
+        require(b.buyer == msg.sender || isOperator(b.buyer, msg.sender), "ZestyMarket_ERC20_V1: Not buyer or operator");
         require(s.buyerCampaign != 0, "ZestyMarket_ERC20_V1: Does not have a bid");
         require(s.buyerCampaignApproved == _FALSE, "ZestyMarket_ERC20_V1: Already approved");
 
-        BuyerCampaign storage b = _buyerCampaigns[s.buyerCampaign];
         uint256 pricePending = s.pricePending;
         s.pricePending = 0;
         s.buyerCampaign = 0;
@@ -619,12 +619,12 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault, ReentrancyGuard {
     }
 
     function sellerAuctionBuyerCancel(uint256 _sellerAuctionId) public {
-        _sellerAuctionReject(_sellerAuctionId);
+        _sellerAuctionBuyerCancel(_sellerAuctionId);
     }
 
-    function sellerAuctionRejectBatch(uint256[] memory _sellerAuctionId) public {
+    function sellerAuctionBuyerCancelBatch(uint256[] memory _sellerAuctionId) public {
         for (uint i=0; i < _sellerAuctionId.length; i++) {
-            _sellerAuctionReject(_sellerAuctionId[i]);
+            _sellerAuctionBuyerCancel(_sellerAuctionId[i]);
         }
     }
 
