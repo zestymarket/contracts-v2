@@ -63,7 +63,7 @@ describe('ZestyNFT', function() {
 
   it('It should allow locking and retrieval of ZestyToken through burning', async function() {
     const ZestyToken = await ethers.getContractFactory('ZestyToken');
-    zestyToken = await ZestyToken.deploy();
+    zestyToken = await ZestyToken.deploy(signers[0].address);
     await zestyToken.deployed();
 
     await zestyNFT.setZestyTokenAddress(zestyToken.address);

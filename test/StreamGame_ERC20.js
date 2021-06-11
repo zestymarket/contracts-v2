@@ -9,7 +9,7 @@ describe('StreamGame_ERC20', function() {
     signers = await ethers.getSigners();
 
     const ZestyToken = await ethers.getContractFactory('ZestyToken');
-    zestyToken = await ZestyToken.deploy();
+    zestyToken = await ZestyToken.deploy(signers[0].address);
     await zestyToken.deployed();
 
     const StreamGame = await ethers.getContractFactory('StreamGame_ERC20');
