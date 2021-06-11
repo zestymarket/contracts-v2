@@ -7,19 +7,18 @@ import "./openzeppelin/contracts/math/SafeMath.sol";
 import "./openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./openzeppelin/contracts/access/Ownable.sol";
 import "./openzeppelin/contracts/utils/Context.sol";
-import "./ZestyToken.sol";
 
 contract ZestyNFT is ERC721, Ownable, ReentrancyGuard { 
     using SafeMath for uint256;
     uint256 private _tokenCount = 0;
     address private _zestyTokenAddress;
-    ZestyToken private _zestyToken;
+    ZestyInterface private _zestyToken;
 
     constructor(address zestyTokenAddress_) 
         ERC721("Zesty Market NFT", "ZESTYNFT") 
     {
         _zestyTokenAddress = zestyTokenAddress_;
-        _zestyToken = ZestyToken(zestyTokenAddress_);
+        _zestyToken = ZestyInterface(zestyTokenAddress_);
     }
 
     event Mint(
@@ -64,7 +63,7 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
             string memory uri
         ) 
     {
-        require(_exists(tokenId), "ZestyNFT: Token does not exist");
+        require(_exists(tokenId), "ZestyNFT::getTokenData: Token does not exist");
         TokenData storage a = _tokenData[tokenId];
         string memory _uri = tokenURI(tokenId);
 
@@ -83,7 +82,7 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
     // This will cause a problem with the ERC20 balances denoted by zestyTokenValue
     function setZestyTokenAddress(address zestyTokenAddress_) public onlyOwner {
         _zestyTokenAddress = zestyTokenAddress_;
-        _zestyToken = ZestyToken(zestyTokenAddress_);
+        _zestyToken = ZestyInterface(zestyTokenAddress_);
 
         emit NewZestyTokenAddress(zestyTokenAddress_);
     }
@@ -118,11 +117,11 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
     function lockZestyToken(uint256 _tokenId, uint256 _value) public nonReentrant {
         require(
             _zestyTokenAddress != address(0),
-            "ZestyNFT: Unable to lock ZestyTokens as zestyToken is not ready"
+            "ZestyNFT::lockZestyToken: Unable to lock ZestyTokens as zestyToken is not ready"
         );
 
         if (!_zestyToken.transferFrom(_msgSender(), address(this), _value))
-            revert("ZestyNFT: Transfer of ZestyTokens to ZestyNFT failed");
+            revert("ZestyNFT::lockZestyToken: Transfer of ZestyTokens to ZestyNFT failed");
 
         TokenData storage a = _tokenData[_tokenId];
         a.zestyTokenValue = a.zestyTokenValue.add(_value);
@@ -136,7 +135,7 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
     function burn(uint256 _tokenId) public nonReentrant {
         require(
             _isApprovedOrOwner(_msgSender(), _tokenId), 
-            "ZestyNFT: Caller is not owner nor approved"
+            "ZestyNFT::burn: Caller is not owner nor approved"
         );
         TokenData storage a = _tokenData[_tokenId];
         uint256 zestyTokenValue = a.zestyTokenValue;
@@ -144,7 +143,7 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
 
         if(_zestyTokenAddress != address(0)) {
             if (!_zestyToken.transfer(_msgSender(), zestyTokenValue))
-                revert("ZestyNFT: Transfer of ZestyTokens from ZestyNFT to caller failed");
+                revert("ZestyNFT::burn: Transfer of ZestyTokens from ZestyNFT to caller failed");
         }
 
         _burn(_tokenId);
@@ -156,11 +155,11 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
     }
 
     function setTokenURI(uint256 _tokenId, string memory _uri) public {
-        require(_exists(_tokenId), "ZestyNFT: Token does not exist");
-        require(ownerOf(_tokenId) == _msgSender(), "ZestyNFT: Caller not owner");
+        require(_exists(_tokenId), "ZestyNFT::setTokenURI: Token does not exist");
+        require(ownerOf(_tokenId) == _msgSender(), "ZestyNFT::setTokenURI: Caller not owner");
 
         TokenData storage a = _tokenData[_tokenId];
-        require(a.creator == _msgSender(), "ZestyNFT: Caller is not creator of token");
+        require(a.creator == _msgSender(), "ZestyNFT::setTokenURI: Caller is not creator of token");
 
         _setTokenURI(_tokenId, _uri);
 
@@ -169,4 +168,9 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
             _uri
         );
     }
+}
+
+interface ZestyInterface {
+    function transfer(address dst, uint rawAmount) external returns (bool);
+    function transferFrom(address src, address dst, uint rawAmount) external returns (bool);
 }

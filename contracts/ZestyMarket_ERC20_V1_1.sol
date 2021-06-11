@@ -3,20 +3,19 @@ pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
 import "./openzeppelin/contracts/math/SafeMath.sol";
-import "./openzeppelin/contracts/access/Ownable.sol";
 import "./openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./ZestyVault.sol";
 
 /**
- * @title Zesty Market V1 using ERC20
+ * @title Zesty Market V1_1 using ERC20
  * @author Zesty Market
  * @notice 
  *   Deposit ZestyNFTs for Adslots Auctions and Fulfillment.
  *   Primary use-case of the contract is to experiment on UX flow and value transfer.
  *   No validation using shamir secret shares is done in this version
  */
-contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault, ReentrancyGuard {
+contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeMath for uint32;
 
@@ -55,6 +54,7 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault, ReentrancyGuard {
         uint256 auctionTimeEnd;
         uint256 contractTimeStart;
         uint256 contractTimeEnd;
+        uint256 priceStart;
         uint256 pricePending;
         uint256 priceEnd;
         uint256 buyerCampaign;
@@ -352,6 +352,7 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault, ReentrancyGuard {
             _priceStart,
             0,
             0,
+            0,
             s.autoApprove
         );
 
@@ -520,6 +521,7 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault, ReentrancyGuard {
 
     function _sellerAuctionApprove(uint256 _sellerAuctionId) private {
         SellerAuction storage s = _sellerAuctions[_sellerAuctionId];
+        BuyerCampaign storage b = _buyerCampaigns[s.buyerCampaign];
         require(s.seller != address(0), "ZestyMarket_ERC20_V1: Seller Auction is invalid");
         require(s.seller == msg.sender || isOperator(s.seller, msg.sender), "ZestyMarket_ERC20_V1: Not seller or operator");
         require(s.buyerCampaign != 0, "ZestyMarket_ERC20_V1: Does not have a bid");
@@ -528,7 +530,7 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault, ReentrancyGuard {
         uint256 price = getSellerAuctionPrice(_sellerAuctionId);
         require(price > 0, "ZestyMarket_ERC20_V1: Auction has expired");
         s.priceEnd = price;
-        uint256 priceDiff = s.pricePending.sub(priceEnd);
+        uint256 priceDiff = s.pricePending.sub(s.priceEnd);
         s.pricePending = 0;
 
         if(!IERC20(_erc20Address).transfer(b.buyer, priceDiff)) {
@@ -547,7 +549,8 @@ contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault, ReentrancyGuard {
 
         emit SellerAuctionBuyerCampaignApprove(
             _sellerAuctionId,
-            s.buyerCampaign
+            s.buyerCampaign,
+            s.priceEnd
         );
         emit ContractCreate(
             _contractCount,
