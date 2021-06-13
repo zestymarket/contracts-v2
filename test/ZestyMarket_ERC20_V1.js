@@ -117,8 +117,8 @@ describe('ZestyMarket_ERC20_V1', function() {
     // should not be able to withdraw once an auction is created
     await expect(zestyMarket.sellerNFTWithdraw(0)).to.be.reverted;
 
-    await expect(zestyMarket.sellerAuctionCancel(0)).to.be.reverted;
-    await zestyMarket.sellerAuctionCancel(1);
+    await expect(zestyMarket.sellerAuctionCancelBatch([0])).to.be.reverted;
+    await zestyMarket.sellerAuctionCancelBatch([1]);
     
     await zestyMarket.sellerNFTWithdraw(0);
     data = await zestyMarket.getSellerNFTSetting(0);
@@ -173,7 +173,7 @@ describe('ZestyMarket_ERC20_V1', function() {
     await expect(zestyMarket.sellerNFTWithdraw(0)).to.be.reverted;
 
     // seller cannot cancel once there's a bid
-    await expect(zestyMarket.sellerAuctionCancel(1)).to.be.reverted;
+    await expect(zestyMarket.sellerAuctionCancelBatch([1])).to.be.reverted;
 
     await zestyMarket.sellerAuctionReject(1);
     data = await zestyMarket.getSellerAuction(1);
@@ -195,7 +195,7 @@ describe('ZestyMarket_ERC20_V1', function() {
     expect(data).to.equal(0);
 
     // allow cancellation and withdrawal of NFT once rejection occured
-    await zestyMarket.sellerAuctionCancel(1);
+    await zestyMarket.sellerAuctionCancelBatch([1]);
     data = await zestyMarket.getSellerAuction(1);
     expect(data.seller).to.equal(ethers.constants.AddressZero);
     expect(data.tokenId).to.equal(0);
@@ -208,7 +208,7 @@ describe('ZestyMarket_ERC20_V1', function() {
     expect(data.buyerCampaign).to.equal(0);
     expect(data.buyerCampaignApproved).to.equal(0);
 
-    await expect(zestyMarket.sellerAuctionCancel(1)).to.be.reverted;
+    await expect(zestyMarket.sellerAuctionCancelBatch([1])).to.be.reverted;
 
     await zestyMarket.sellerNFTWithdraw(0);
     data = await zestyMarket.getSellerNFTSetting(0);
@@ -243,7 +243,7 @@ describe('ZestyMarket_ERC20_V1', function() {
     await expect(zestyMarket.sellerNFTWithdraw(0)).to.be.reverted;
 
     // seller cannot cancel once there's a bid
-    await expect(zestyMarket.sellerAuctionCancel(1)).to.be.reverted;
+    await expect(zestyMarket.sellerAuctionCancelBatch([1])).to.be.reverted;
 
     await zestyMarket.sellerAuctionApprove(1);
     data = await zestyMarket.getSellerAuction(1);
@@ -262,7 +262,7 @@ describe('ZestyMarket_ERC20_V1', function() {
     await expect(zestyMarket.sellerNFTWithdraw(0)).to.be.reverted;
 
     // seller cannot cancel after approval
-    await expect(zestyMarket.sellerAuctionCancel(1)).to.be.reverted;
+    await expect(zestyMarket.sellerAuctionCancelBatch([1])).to.be.reverted;
 
     // seller cannot withdraw immediately after approval
     await expect(zestyMarket.contractWithdraw(1)).to.be.reverted;
@@ -299,7 +299,7 @@ describe('ZestyMarket_ERC20_V1', function() {
     await expect(zestyMarket.contractWithdraw(1)).to.be.reverted;
 
     // allow withdrawal of NFT once process is complete
-    await expect(zestyMarket.sellerAuctionCancel(1)).to.be.reverted;
+    await expect(zestyMarket.sellerAuctionCancelBatch([1])).to.be.reverted;
 
     await zestyMarket.sellerNFTWithdraw(0);
     data = await zestyMarket.getSellerNFTSetting(0);
@@ -333,7 +333,7 @@ describe('ZestyMarket_ERC20_V1', function() {
     await expect(zestyMarket.sellerNFTWithdraw(0)).to.be.reverted;
 
     // seller cannot cancel once there's a bid
-    await expect(zestyMarket.sellerAuctionCancel(1)).to.be.reverted;
+    await expect(zestyMarket.sellerAuctionCancelBatch([1])).to.be.reverted;
 
     // seller does not need to approve
     await expect(zestyMarket.sellerAuctionApprove(1)).to.be.reverted;
@@ -356,7 +356,7 @@ describe('ZestyMarket_ERC20_V1', function() {
     await expect(zestyMarket.sellerNFTWithdraw(0)).to.be.reverted;
 
     // seller cannot cancel after approval
-    await expect(zestyMarket.sellerAuctionCancel(1)).to.be.reverted;
+    await expect(zestyMarket.sellerAuctionCancelBatch([1])).to.be.reverted;
 
     // seller cannot withdraw immediately after approval
     await expect(zestyMarket.contractWithdraw(1)).to.be.reverted;
@@ -393,7 +393,7 @@ describe('ZestyMarket_ERC20_V1', function() {
     await expect(zestyMarket.contractWithdraw(1)).to.be.reverted;
 
     // allow withdrawal of NFT once process is complete
-    await expect(zestyMarket.sellerAuctionCancel(1)).to.be.reverted;
+    await expect(zestyMarket.sellerAuctionCancelBatch([1])).to.be.reverted;
 
     await zestyMarket.sellerNFTWithdraw(0);
     data = await zestyMarket.getSellerNFTSetting(0);

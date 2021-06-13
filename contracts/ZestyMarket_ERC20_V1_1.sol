@@ -7,14 +7,6 @@ import "./openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./ZestyVault.sol";
 
-/**
- * @title Zesty Market V1_1 using ERC20
- * @author Zesty Market
- * @notice 
- *   Deposit ZestyNFTs for Adslots Auctions and Fulfillment.
- *   Primary use-case of the contract is to experiment on UX flow and value transfer.
- *   No validation using shamir secret shares is done in this version
- */
 contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeMath for uint32;
@@ -79,15 +71,9 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
         uint256 buyerCampaignId,
         uint256 pricePending
     );
-    event SellerAuctionBuyerCampaignApprove(
-        uint256 indexed sellerAuctionId, 
-        uint256 buyerCampaignId,
-        uint256 priceEnd
-    );
-    event SellerAuctionBuyerCampaignReject(
-        uint256 indexed sellerAuctionId, 
-        uint256 buyerCampaignId
-    );
+    event SellerAuctionBuyerCampaignBuyerCancel(uint256 indexed sellerAuctionId);
+    event SellerAuctionBuyerCampaignApprove( uint256 indexed sellerAuctionId, uint256 priceEnd);
+    event SellerAuctionBuyerCampaignReject( uint256 indexed sellerAuctionId);
 
     struct BuyerCampaign {
         address buyer;
@@ -136,23 +122,20 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
             uint256 inProgressCount
         ) 
     {
-        SellerNFTSetting storage s = _sellerNFTSettings[_tokenId];
-        tokenId = s.tokenId;
-        seller = s.seller;
-        autoApprove = s.autoApprove;
-        inProgressCount = s.inProgressCount;
+        tokenId = _sellerNFTSettings[_tokenId].tokenId;
+        seller = _sellerNFTSettings[_tokenId].seller;
+        autoApprove = _sellerNFTSettings[_tokenId].autoApprove;
+        inProgressCount = _sellerNFTSettings[_tokenId].inProgressCount;
     }
 
     function getSellerAuctionPrice(uint256 _sellerAuctionId) public view returns (uint256) {
         SellerAuction storage s = _sellerAuctions[_sellerAuctionId];
         uint256 timeNow = block.timestamp;
-
-        uint256 timePassed = timeNow.sub(s.auctionTimeStart);
         uint256 timeTotal = s.contractTimeEnd.sub(s.auctionTimeStart);
         uint256 rescalePriceStart = s.priceStart.mul(100000);
         uint256 gradient = rescalePriceStart.div(timeTotal);
 
-        return rescalePriceStart.sub(gradient.mul(timePassed)).div(100000);
+        return rescalePriceStart.sub(gradient.mul(timeNow.sub(s.auctionTimeStart))).div(100000);
     }
 
     function getSellerAuction(uint256 _sellerAuctionId) 
@@ -172,18 +155,17 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
             uint8 buyerCampaignApproved
         )
     {
-        SellerAuction storage s = _sellerAuctions[_sellerAuctionId];
-        seller = s.seller;
-        tokenId = s.tokenId;
-        auctionTimeStart = s.auctionTimeStart;
-        auctionTimeEnd = s.auctionTimeEnd;
-        contractTimeStart = s.contractTimeStart;
-        contractTimeEnd = s.contractTimeEnd;
-        priceStart = s.priceStart;
-        pricePending = s.pricePending;
-        priceEnd = s.priceEnd;
-        buyerCampaign = s.buyerCampaign;
-        buyerCampaignApproved = s.buyerCampaignApproved;
+        seller = _sellerAuctions[_sellerAuctionId].seller;
+        tokenId = _sellerAuctions[_sellerAuctionId].tokenId;
+        auctionTimeStart = _sellerAuctions[_sellerAuctionId].auctionTimeStart;
+        auctionTimeEnd = _sellerAuctions[_sellerAuctionId].auctionTimeEnd;
+        contractTimeStart = _sellerAuctions[_sellerAuctionId].contractTimeStart;
+        contractTimeEnd = _sellerAuctions[_sellerAuctionId].contractTimeEnd;
+        priceStart = _sellerAuctions[_sellerAuctionId].priceStart;
+        pricePending = _sellerAuctions[_sellerAuctionId].pricePending;
+        priceEnd = _sellerAuctions[_sellerAuctionId].priceEnd;
+        buyerCampaign = _sellerAuctions[_sellerAuctionId].buyerCampaign;
+        buyerCampaignApproved = _sellerAuctions[_sellerAuctionId].buyerCampaignApproved;
     }
 
     function getBuyerCampaign(uint256 _buyerCampaignId)
@@ -194,9 +176,8 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
             string memory uri
         )
     {
-        BuyerCampaign storage b = _buyerCampaigns[_buyerCampaignId];
-        buyer = b.buyer;
-        uri = b.uri;
+        buyer = _buyerCampaigns[_buyerCampaignId].buyer;
+        uri = _buyerCampaigns[_buyerCampaignId].uri;
     }
 
     function getContract(uint256 _contractId)
@@ -211,13 +192,12 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
             uint8 withdrawn
         )
     {
-        Contract storage c = _contracts[_contractId];
-        sellerAuctionId = c.sellerAuctionId;
-        buyerCampaignId = c.buyerCampaignId;
-        contractTimeStart = c.contractTimeStart;
-        contractTimeEnd = c.contractTimeEnd;
-        contractValue = c.contractValue;
-        withdrawn = c.withdrawn;
+        sellerAuctionId = _contracts[_contractId].sellerAuctionId;
+        buyerCampaignId = _contracts[_contractId].buyerCampaignId;
+        contractTimeStart = _contracts[_contractId].contractTimeStart;
+        contractTimeEnd = _contracts[_contractId].contractTimeEnd;
+        contractValue = _contracts[_contractId].contractValue;
+        withdrawn = _contracts[_contractId].withdrawn;
     }
 
     /* 
@@ -372,27 +352,6 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
 
     }
 
-    function sellerAuctionCreate(
-        uint256 _tokenId,
-        uint256 _auctionTimeStart,
-        uint256 _auctionTimeEnd,
-        uint256 _contractTimeStart,
-        uint256 _contractTimeEnd,
-        uint256 _priceStart
-    ) 
-        external
-    {
-        _sellerAuctionCreate(
-            getDepositor(_tokenId),
-            _tokenId,
-            _auctionTimeStart,
-            _auctionTimeEnd,
-            _contractTimeStart,
-            _contractTimeEnd,
-            _priceStart
-        );
-    }
-
     function sellerAuctionCreateBatch(
         uint256 _tokenId,
         uint256[] memory _auctionTimeStart,
@@ -442,10 +401,6 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
         );
     }
 
-    function sellerAuctionCancel(uint256 _sellerAuctionId) public {
-        _sellerAuctionCancel(_sellerAuctionId);
-    }
-
     function sellerAuctionCancelBatch(uint256[] memory _sellerAuctionId) public {
         for(uint i=0; i < _sellerAuctionId.length; i++) {
             _sellerAuctionCancel(_sellerAuctionId[i]);
@@ -492,11 +447,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
                 _FALSE
             );
 
-            emit SellerAuctionBuyerCampaignApprove(
-                _sellerAuctionId,
-                _buyerCampaignId,
-                price
-            );
+            emit SellerAuctionBuyerCampaignApprove( _sellerAuctionId, price);
             emit ContractCreate(
                 _contractCount,
                 _sellerAuctionId,
@@ -508,14 +459,34 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
             _contractCount = _contractCount.add(1);
         }
     }
-
-    function sellerAuctionBid(uint256 _sellerAuctionId, uint256 _buyerCampaignId) public {
-        _sellerAuctionBid(_sellerAuctionId, _buyerCampaignId);
-    }
-
+    
     function sellerAuctionBidBatch(uint256[] memory _sellerAuctionId, uint256 _buyerCampaignId) public {
         for (uint i=0; i < _sellerAuctionId.length; i++) {
             _sellerAuctionBid(_sellerAuctionId[i], _buyerCampaignId);
+        }
+    }
+
+    function _sellerAuctionBidCancel(uint256 _sellerAuctionId) private {
+        SellerAuction storage s = _sellerAuctions[_sellerAuctionId];
+        BuyerCampaign storage b = _buyerCampaigns[s.buyerCampaign];
+        require(s.seller != address(0), "ZestyMarket_ERC20_V1: Seller Auction is invalid");
+        require(msg.sender == b.buyer || isOperator(b.buyer, msg.sender), "ZestyMarket_ERC20_V1: Not buyer or operator");
+        require(s.buyerCampaignApproved == _FALSE, "ZestyMarket_ERC20_V1: Seller already approved");
+
+        uint256 pricePending = s.pricePending;
+        s.pricePending = 0;
+        s.buyerCampaign = 0;
+
+        if(!IERC20(_erc20Address).transfer(b.buyer, pricePending)) {
+            revert("ZestyMarket_ERC20_V1: Transfer of ERC20 failed, check if sufficient allowance is provided");
+        }
+
+        emit SellerAuctionBuyerCampaignBuyerCancel(_sellerAuctionId);
+    }
+
+    function sellerAuctionBidCancelBatch(uint256[] memory _sellerAuctionId) public {
+        for (uint i=0; i < _sellerAuctionId.length; i++) {
+            _sellerAuctionBidCancel(_sellerAuctionId[i]);
         }
     }
 
@@ -547,11 +518,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
             _FALSE
         );
 
-        emit SellerAuctionBuyerCampaignApprove(
-            _sellerAuctionId,
-            s.buyerCampaign,
-            s.priceEnd
-        );
+        emit SellerAuctionBuyerCampaignApprove( _sellerAuctionId, s.priceEnd);
         emit ContractCreate(
             _contractCount,
             _sellerAuctionId,
@@ -561,10 +528,6 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
             s.priceEnd
         );
         _contractCount = _contractCount.add(1);
-    }
-
-    function sellerAuctionApprove(uint256 _sellerAuctionId) public {
-        _sellerAuctionApprove(_sellerAuctionId);
     }
 
     function sellerAuctionApproveBatch(uint256[] memory _sellerAuctionId) public {
@@ -589,45 +552,12 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
             revert("ZestyMarket_ERC20_V1: Transfer of ERC20 failed, check if sufficient allowance is provided");
         }
 
-        emit SellerAuctionBuyerCampaignReject(_sellerAuctionId, s.buyerCampaign);
-    }
-
-    function sellerAuctionReject(uint256 _sellerAuctionId) public {
-        _sellerAuctionReject(_sellerAuctionId);
+        emit SellerAuctionBuyerCampaignReject(_sellerAuctionId);
     }
 
     function sellerAuctionRejectBatch(uint256[] memory _sellerAuctionId) public {
         for (uint i=0; i < _sellerAuctionId.length; i++) {
             _sellerAuctionReject(_sellerAuctionId[i]);
-        }
-    }
-
-    function _sellerAuctionBuyerCancel(uint256 _sellerAuctionId) private nonReentrant {
-        SellerAuction storage s = _sellerAuctions[_sellerAuctionId];
-        BuyerCampaign storage b = _buyerCampaigns[s.buyerCampaign];
-        require(s.seller != address(0), "ZestyMarket_ERC20_V1: Seller Auction is invalid");
-        require(b.buyer == msg.sender || isOperator(b.buyer, msg.sender), "ZestyMarket_ERC20_V1: Not buyer or operator");
-        require(s.buyerCampaign != 0, "ZestyMarket_ERC20_V1: Does not have a bid");
-        require(s.buyerCampaignApproved == _FALSE, "ZestyMarket_ERC20_V1: Already approved");
-
-        uint256 pricePending = s.pricePending;
-        s.pricePending = 0;
-        s.buyerCampaign = 0;
-
-        if(!IERC20(_erc20Address).transfer(b.buyer, pricePending)) {
-            revert("ZestyMarket_ERC20_V1: Transfer of ERC20 failed, check if sufficient allowance is provided");
-        }
-
-        emit SellerAuctionBuyerCampaignReject(_sellerAuctionId, s.buyerCampaign);
-    }
-
-    function sellerAuctionBuyerCancel(uint256 _sellerAuctionId) public {
-        _sellerAuctionBuyerCancel(_sellerAuctionId);
-    }
-
-    function sellerAuctionBuyerCancelBatch(uint256[] memory _sellerAuctionId) public {
-        for (uint i=0; i < _sellerAuctionId.length; i++) {
-            _sellerAuctionBuyerCancel(_sellerAuctionId[i]);
         }
     }
 
@@ -656,10 +586,6 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
         );
 
         emit ContractWithdraw(_contractId);
-    }
-
-    function contractWithdraw(uint256 _contractId) public {
-        _contractWithdraw(_contractId);
     }
 
     function contractWithdrawBatch(uint256[] memory _contractId) public {
