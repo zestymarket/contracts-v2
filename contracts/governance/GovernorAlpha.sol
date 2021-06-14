@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // From Compound Finance
 
-pragma solidity ^0.7.0;
+pragma solidity ^0.7.6;
 pragma experimental ABIEncoderV2;
 
 contract GovernorAlpha {
