@@ -1,24 +1,24 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.7.0;
+pragma solidity ^0.7.6;
 
-import "./openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "./openzeppelin/contracts/math/SafeMath.sol";
-import "./openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "./openzeppelin/contracts/access/Ownable.sol";
-import "./openzeppelin/contracts/utils/Context.sol";
+import "./utils/ERC721.sol";
+import "./interfaces/IERC20.sol";
+import "./utils/SafeMath.sol";
+import "./utils/ReentrancyGuard.sol";
+import "./utils/Ownable.sol";
 
 contract ZestyNFT is ERC721, Ownable, ReentrancyGuard { 
     using SafeMath for uint256;
     uint256 private _tokenCount = 0;
     address private _zestyTokenAddress;
-    ZestyInterface private _zestyToken;
+    IERC20 private _zestyToken;
 
     constructor(address zestyTokenAddress_) 
         ERC721("Zesty Market NFT", "ZESTYNFT") 
     {
         _zestyTokenAddress = zestyTokenAddress_;
-        _zestyToken = ZestyInterface(zestyTokenAddress_);
+        _zestyToken = IERC20(zestyTokenAddress_);
     }
 
     event Mint(
@@ -82,7 +82,7 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
     // This will cause a problem with the ERC20 balances denoted by zestyTokenValue
     function setZestyTokenAddress(address zestyTokenAddress_) public onlyOwner {
         _zestyTokenAddress = zestyTokenAddress_;
-        _zestyToken = ZestyInterface(zestyTokenAddress_);
+        _zestyToken = IERC20(zestyTokenAddress_);
 
         emit NewZestyTokenAddress(zestyTokenAddress_);
     }
@@ -168,9 +168,4 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
             _uri
         );
     }
-}
-
-interface ZestyInterface {
-    function transfer(address dst, uint rawAmount) external returns (bool);
-    function transferFrom(address src, address dst, uint rawAmount) external returns (bool);
 }

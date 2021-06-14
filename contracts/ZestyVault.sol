@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.7.0;
+pragma solidity ^0.7.6;
 
-import "./openzeppelin/contracts/token/ERC721/ERC721Holder.sol";
-import "./openzeppelin/contracts/utils/Context.sol";
-import "./ZestyNFT.sol";
+import "./utils/Context.sol";
+import "./interfaces/IERC721Receiver.sol";
+import "./interfaces/IERC721.sol";
 
 /**
  * @title ZestyVault for depositing ZestyNFTs
  * @author Zesty Market
  * @notice Contract for depositing and withdrawing ZestyNFTs
  */
-abstract contract ZestyVault is ERC721Holder, Context {
+abstract contract ZestyVault is Context, IERC721Receiver {
     address private _zestyNFTAddress;
-    ZestyNFT private _zestyNFT;
+    IERC721 private _zestyNFT;
     
     constructor(address zestyNFTAddress_) {
         _zestyNFTAddress = zestyNFTAddress_;
-        _zestyNFT = ZestyNFT(zestyNFTAddress_);
+        _zestyNFT = IERC721(zestyNFTAddress_);
     }
 
     mapping (uint256 => address) private _nftDeposits;
@@ -93,6 +93,11 @@ abstract contract ZestyVault is ERC721Holder, Context {
 
         emit WithdrawZestyNFT(_tokenId);
     }
+
+    function onERC721Received(address, address, uint256, bytes memory) public virtual override returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
+
 
     modifier onlyDepositor(uint256 _tokenId) {
         require(

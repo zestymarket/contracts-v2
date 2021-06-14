@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 // From Compound Finance
 
-pragma solidity ^0.7.0;
+pragma solidity ^0.7.6;
 
-import "../openzeppelin/contracts/math/SafeMath.sol";
+import "../utils/SafeMath.sol";
 
 contract Timelock {
     using SafeMath for uint;
