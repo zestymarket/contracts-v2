@@ -46,7 +46,12 @@ Block Explorer: (Leave Blank, alternatively)
 
 
 # Contracts
-Code in `utils` and `interfaces` are adapted from [openzeppelin](https://github.com/OpenZeppelin/openzeppelin-contracts/tree/release-v3.4/contracts)
+
+## References
+- Code in `utils` and `interfaces` are adapted from [openzeppelin](https://github.com/OpenZeppelin/openzeppelin-contracts/tree/release-v3.4/contracts)
+
+- Code in `governance` is adapted from [compound](https://github.com/compound-finance/compound-protocol)
+
 
 ## ZestyToken.sol
 ZestyToken, $ZEST, is both a governance token as well as a utility token. 
