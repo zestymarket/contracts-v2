@@ -3,7 +3,6 @@ pragma solidity ^0.7.6;
 pragma experimental ABIEncoderV2;
 
 import "./utils/SafeMath.sol";
-import "./utils/Ownable.sol";
 import "./ZestyVault.sol";
 import "./interfaces/IERC20.sol";
 import "./utils/ReentrancyGuard.sol";
@@ -16,7 +15,7 @@ import "./utils/ReentrancyGuard.sol";
  *   Primary use-case of the contract is to experiment on UX flow and value transfer.
  *   No validation using shamir secret shares is done in this version
  */
-contract ZestyMarket_ERC20_V1 is Ownable, ZestyVault, ReentrancyGuard {
+contract ZestyMarket_ERC20_V1 is ZestyVault, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeMath for uint32;
 

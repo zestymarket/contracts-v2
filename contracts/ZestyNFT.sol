@@ -14,7 +14,8 @@ contract ZestyNFT is ERC721, Ownable, ReentrancyGuard {
     address private _zestyTokenAddress;
     IERC20 private _zestyToken;
 
-    constructor(address zestyTokenAddress_) 
+    constructor(address owner_, address zestyTokenAddress_) 
+        Ownable(owner_)
         ERC721("Zesty Market NFT", "ZESTYNFT") 
     {
         _zestyTokenAddress = zestyTokenAddress_;

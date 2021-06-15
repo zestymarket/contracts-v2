@@ -17,7 +17,7 @@ describe('ZestyMarket_ERC20_V1', function() {
     await zestyToken.deployed();
 
     let ZestyNFT = await ethers.getContractFactory('ZestyNFT');
-    zestyNFT = await ZestyNFT.deploy(zestyToken.address);
+    zestyNFT = await ZestyNFT.deploy(signers[0].address, zestyToken.address);
 
     let ZestyMarket = await ethers.getContractFactory('ZestyMarket_ERC20_V1');
     zestyMarket = await ZestyMarket.deploy(zestyToken.address, zestyNFT.address);

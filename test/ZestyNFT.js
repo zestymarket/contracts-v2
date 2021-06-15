@@ -10,7 +10,7 @@ describe('ZestyNFT', function() {
     signers = await ethers.getSigners();
 
     const ZestyNFT = await ethers.getContractFactory('ZestyNFT');
-    zestyNFT = await ZestyNFT.deploy(ethers.constants.AddressZero);
+    zestyNFT = await ZestyNFT.deploy(signers[0].address, ethers.constants.AddressZero);
     await zestyNFT.deployed();
   });
 
