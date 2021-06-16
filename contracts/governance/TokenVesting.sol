@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.7.6;
 
-import "./interfaces/IERC20.sol";
-import "./utils/Ownable.sol";
-import "./utils/SafeMath.sol";
-import "./utils/ReentrancyGuard.sol";
+import "../interfaces/IERC20.sol";
+import "../utils/Ownable.sol";
+import "../utils/SafeMath.sol";
+import "../utils/ReentrancyGuard.sol";
 
 // Owner is the multisig contract
 contract TokenVesting is Ownable, ReentrancyGuard {

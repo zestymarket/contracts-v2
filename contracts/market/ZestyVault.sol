@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.7.6;
 
-import "./utils/Context.sol";
-import "./interfaces/IERC721Receiver.sol";
-import "./interfaces/IERC721.sol";
+import "../utils/Context.sol";
+import "../interfaces/IERC721Receiver.sol";
+import "../interfaces/IERC721.sol";
 
 /**
  * @title ZestyVault for depositing ZestyNFTs

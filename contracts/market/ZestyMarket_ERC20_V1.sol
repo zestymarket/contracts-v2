@@ -2,10 +2,10 @@
 pragma solidity ^0.7.6;
 pragma experimental ABIEncoderV2;
 
-import "./utils/SafeMath.sol";
-import "./ZestyVault.sol";
-import "./interfaces/IERC20.sol";
-import "./utils/ReentrancyGuard.sol";
+import "../utils/SafeMath.sol";
+import "../ZestyVault.sol";
+import "../interfaces/IERC20.sol";
+import "../utils/ReentrancyGuard.sol";
 
 /**
  * @title Zesty Market V1 using ERC20

@@ -2,11 +2,11 @@
 
 pragma solidity ^0.7.6;
 
-import "./utils/ERC721.sol";
-import "./interfaces/IERC20.sol";
-import "./utils/SafeMath.sol";
-import "./utils/ReentrancyGuard.sol";
-import "./utils/Ownable.sol";
+import "../utils/ERC721.sol";
+import "../interfaces/IERC20.sol";
+import "../utils/SafeMath.sol";
+import "../utils/ReentrancyGuard.sol";
+import "../utils/Ownable.sol";
 
 contract ZestyNFT is ERC721, Ownable, ReentrancyGuard { 
     using SafeMath for uint256;
