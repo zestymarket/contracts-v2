@@ -5,40 +5,40 @@ pragma solidity ^0.7.6;
 
 import "../utils/Ownable.sol";
 import "../utils/SafeMath.sol";
-import "../interfaces/IERC20.sol"
-import "../interfaces/IRewardsDistributor";
+import "../interfaces/IERC20.sol";
+import "../interfaces/IRewardsDistributor.sol";
 
 contract RewardsDistributor is Ownable, IRewardsDistributor {
     using SafeMath for uint256;
 
     address private _rewardTokenAddress;
     IERC20 private _rewardToken;
-    Recipient private _recipients;
+    Recipient[] private _recipients;
 
     constructor(address owner_, address rewardTokenAddress_) Ownable(owner_) {
         _rewardTokenAddress = rewardTokenAddress_;
         _rewardToken = IERC20(rewardTokenAddress_);
     }
 
-    event RewardRecipientAdded(uint256 index, address destination, uint256 amount);
+    event RewardRecipientAdded(uint256 index, address recipient, uint256 amount);
     event RewardsDistributed(uint256 amount);
 
     function getRewardToken() public view returns(address) {
         return _rewardTokenAddress;
     }
 
-    function getRecipient(uint256 _index) external view returns (address recipient, uint256 amount) {
+    function getRecipient(uint256 _index) external view override returns (address recipient, uint256 amount) {
         recipient = _recipients[_index].recipient;
         amount = _recipients[_index].amount;
     }
 
-    function getRecipientsLength() external view returns (uint256) {
+    function getRecipientsLength() external view override returns (uint256) {
         return _recipients.length; 
     }
 
     function setRewardToken(address rewardTokenAddress_) external onlyOwner {
         _rewardTokenAddress = rewardTokenAddress_;
-        _rewardToken = IERC20(rewardTokenAddress_k);
+        _rewardToken = IERC20(rewardTokenAddress_);
     } 
 
     function addRewardRecipient(address _recipient, uint256 _amount) external onlyOwner returns (bool) {
@@ -49,16 +49,20 @@ contract RewardsDistributor is Ownable, IRewardsDistributor {
         _recipients.push(r);
 
         emit RewardRecipientAdded(_recipients.length - 1, _recipient, _amount);
-        return true;        
+        return true;
     }
 
     function removeRewardRecipient(uint256 _index) external onlyOwner {
         require(_index <= _recipients.length - 1, "RewardsDistributor::removeRewardRecipient: Index out of bounds");
 
-        for (uint256 i = _index; i < _recipients.length - 1; i++) {
-            _recipients[i] = _recipients[i + 1];
+        if (_index == _recipients.length - 1) {
+            _recipients.pop();
+        } else {
+            for (uint256 i = _index; i < _recipients.length - 1; i++) {
+                _recipients[i] = _recipients[i + 1];
+            }
+            _recipients.pop();
         }
-        _recipients.length = _recipients.length.sub(1);
 
         // Since this function must shift all later entries down to fill the
         // gap from the one it removed, it could in principle consume an
@@ -85,11 +89,11 @@ contract RewardsDistributor is Ownable, IRewardsDistributor {
         return true;
     }
 
-    function distributeRewards(uint256 _amount) external onlyOwner returns (bool) {
+    function distributeRewards(uint256 _amount) external override onlyOwner returns (bool) {
         require(_amount > 0, 
             "RewardsDistributor::distributeRewards: Nothing to distribute"
         );
-        require(_rewardTokenAddress != 0,
+        require(_rewardTokenAddress != address(0),
             "RewardsDistributor::distributeRewards: Cannot send from 0 address"
         );
         require(_rewardToken.balanceOf(address(this)) >= _amount,
@@ -118,7 +122,7 @@ contract RewardsDistributor is Ownable, IRewardsDistributor {
             }
         }
 
-        emit RewardsDistributed(amount);
+        emit RewardsDistributed(_amount);
         return true;
     }
 
