@@ -47,20 +47,24 @@ Block Explorer: (Leave Blank, alternatively)
 
 # Contracts
 
+Documentation about the contracts can be found on our [documentation site https://docs.zesty.market](https://docs.zesty.market/smart-contracts/overview)
+
 ## References
-- Code in `utils` and `interfaces` are adapted from [openzeppelin](https://github.com/OpenZeppelin/openzeppelin-contracts/tree/release-v3.4/contracts)
+- Code in `utils` and `interfaces` are adapted from [openzeppelin-contracts-v3.4](https://github.com/OpenZeppelin/openzeppelin-contracts/tree/release-v3.4/contracts)
 
 - Code in `governance` is adapted from [compound](https://github.com/compound-finance/compound-protocol)
 
 
-## ZestyToken.sol
+## Scratch Documentation
+
+### ZestyToken.sol
 ZestyToken, $ZEST, is both a governance token as well as a utility token. 
 As a Governance token, $ZEST can be used for voting on key decisions in the ZestyDAO.
 As a Utility token, $ZEST can be used in transactions within Zesty Market.
 
 **Specifications**
 
-## ZestyNFT.sol
+### ZestyNFT.sol
 ZestyNFT is the contract which allows a creator to declare advertising slots that can be subsequently rented out. 
 
 These NFTs can be deposited in the ZestyMarket contracts for rent. 
@@ -74,10 +78,10 @@ Rinkeby: 0xa6fC03b3343D72630db8767B179C90b0ccd61354
 
 **Specifications**
 
-## ZestyVault.sol
+### ZestyVault.sol
 ZestyVault is the abstract contract that is inherited by contracts like ZestyMarket to allow for the deposit of ZestyNFTs. Operators can be associated with an address to automate contract interactions.
 
-## ZestyMarket_ERC20_V1.sol
+### ZestyMarket_ERC20_V1.sol
 Zesty Market is the key contract where you can auction out advertising slots as a creator and create advertising campaigns as an advertiser. 
 
 **Addresses**
@@ -87,7 +91,7 @@ Rinkeby (USDC Compound): 0xD6551e7CD4DBbaf4F9186665Faa7A869868DC73e
 
 **Specifications**
 
-## StreamGame_ETH.sol
+### StreamGame_ETH.sol
 StreamGame_ETH is designed to receive donations while a streamer is streaming. The events generated would trigger some screen overlay to encourage viewer engagement.
 
 **Addresses**
@@ -98,7 +102,7 @@ Matic: 0x3943C890D2ff687714358006DECA47B8809bF34D
 
 **Specifications**
 
-## ZestyDice_ETH.sol
+### ZestyDice_ETH.sol
 ZestyDice_ETH is an extension of StreamGame but focused on dice games on stream.
 Like StreamGame_ETH it allows the streamer to receive donations while streaming.
 
