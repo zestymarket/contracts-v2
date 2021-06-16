@@ -8,12 +8,11 @@ import "../utils/SafeMath.sol";
 import "../utils/ReentrancyGuard.sol";
 
 // Inheritance
-import "./interfaces/IStakingRewards.sol";
+import "../interfaces/IStakingRewards.sol";
 import "./RewardsRecipient.sol";
-import "./Pausable.sol";
 
 // https://docs.synthetix.io/contracts/source/contracts/stakingrewards
-contract StakingRewards is IStakingRewards, RewardsRecipient, ReentrancyGuard, Ownable {
+contract StakingRewards is IStakingRewards, RewardsRecipient, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -40,7 +39,7 @@ contract StakingRewards is IStakingRewards, RewardsRecipient, ReentrancyGuard, O
         address rewardsDistributor_,
         address rewardToken_,
         address stakingToken_
-    ) public Owned(_owner) {
+    ) public RewardRecipient(owner_, rewardsDistributor_) {
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
         rewardsDistribution = _rewardsDistribution;
