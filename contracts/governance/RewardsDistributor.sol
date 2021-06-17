@@ -107,17 +107,15 @@ contract RewardsDistributor is Ownable, IRewardsDistributor {
             if (_recipients[i].recipient != address(0) || _recipients[i].amount != 0) {
                 remainder = remainder.sub(_recipients[i].amount);
 
-                // Transfer the SNX
                 _rewardToken.transfer(_recipients[i].recipient, _recipients[i].amount);
 
-                // If the contract implements RewardsDistributionRecipient.sol, inform it how many SNX its received.
                 bytes memory payload = abi.encodeWithSignature("notifyRewardAmount(uint256)", _recipients[i].amount);
 
                 // solhint-disable avoid-low-level-calls
                 (bool success, ) = _recipients[i].recipient.call(payload);
 
                 if (!success) {
-                    // Note: we're ignoring the return value as it will fail for contracts that do not implement RewardsDistributionRecipient.sol
+                    // Note: we're ignoring the return value as it will fail for contracts that do not implement RewardsRecipient.sol
                 }
             }
         }
