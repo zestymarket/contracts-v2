@@ -12,7 +12,6 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
     using SafeMath for uint32;
 
     address private _erc20Address;
-    address private _validator;
     uint256 private _buyerCampaignCount = 1; // 0 is used null values
     uint256 private _sellerAuctionCount = 1; // 0 is used for null values
     uint256 private _contractCount = 1;
