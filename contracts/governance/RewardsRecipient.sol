@@ -8,7 +8,7 @@ import "../utils/Ownable.sol";
 import "../utils/Context.sol";
 
 abstract contract RewardsRecipient is Context, Ownable {
-    address private _rewardsDistributor;
+    address internal _rewardsDistributor;
 
     constructor(address owner_, address rewardsDistributor_) 
         Ownable(owner_) 
@@ -16,7 +16,7 @@ abstract contract RewardsRecipient is Context, Ownable {
         _rewardsDistributor = rewardsDistributor_;
     } 
 
-    function getRewardsDistributor() public view virtual returns (address) {
+    function rewardsDistributor() external view virtual returns (address) {
         return _rewardsDistributor;
     }
 

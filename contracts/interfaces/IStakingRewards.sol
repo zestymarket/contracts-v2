@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.7.6;
 
 // https://docs.synthetix.io/contracts/source/interfaces/istakingrewards
@@ -14,9 +16,11 @@ interface IStakingRewards {
 
     function rewardPerToken() external view returns (uint256);
 
-    function rewardsDistribution() external view returns (address);
+    function rewardsDistributor() external view returns (address);
 
     function rewardsToken() external view returns (address);
+    
+    function stakingToken() external view returns (address);
 
     function totalSupply() external view returns (uint256);
 

@@ -1,515 +1,637 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity ^0.7.6;
 pragma experimental ABIEncoderV2;
 
-import "../utils/Context.sol";
-import "../interfaces/IERC721Receiver.sol";
 import "../utils/SafeMath.sol";
-import "./ZestyNFT.sol";
-import "../governance/ZestyToken.sol";
+import "../utils/ReentrancyGuard.sol";
+import "../interfaces/IERC20.sol";
+import "./ZestyVault.sol";
 
-
-contract AuctionHTLC is Context, IERC721Receiver {
+contract ZestyMarket_ERC20_V2_1 is ZestyVault, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeMath for uint32;
-    address private _tokenAddress;
-    address private _NFTAddress;
-    address private _validator;  // single validator implementation
-    uint256 private _auctionCount = 0;
-    uint256 private _contractCount = 0;
-    uint32 private _availabilityThreshold = 8000; // 80.00% availability threshold
-    uint256 private _burnPerc = 200; // 2.00 % burned upon successful transaction
-    // TODO
-    // uint256 private stakeRedistributionPerc = 400; // 4.00% redistributed to staking and liquidity provider pools
-    uint256 private _validatorPerc = 200; // 2.00% redistributed to validators
 
-    ZestyNFT private _zestyNFT;
-    ZestyToken private _zestyToken;
+    address private _erc20Address;
+    uint256 private _buyerCampaignCount = 1; // 0 is used null values
+    uint256 private _sellerAuctionCount = 1; // 0 is used for null values
+    uint256 private _contractCount = 1;
+    uint8 private constant _FALSE = 1;
+    uint8 private constant _TRUE = 2;
 
     constructor(
-        address tokenAddress_, 
-        address NFTAddress_,
-        address validator_
-    ) {
-        _tokenAddress = tokenAddress_;
-        _NFTAddress = NFTAddress_;
-        _validator = validator_;
-        _zestyNFT = ZestyNFT(_NFTAddress);
-        _zestyToken = ZestyToken(_tokenAddress);
+        address erc20Address_,
+        address zestyNFTAddress_
+    ) 
+        ZestyVault(zestyNFTAddress_) 
+    {
+        _erc20Address = erc20Address_;
     }
-
-    // Auction Section 
-    enum AuctionState {
-        START,
-        SUCCESS,
-        EXPIRE,
-        CANCEL
-    }
-
-    event AuctionStart(
-        uint256 indexed auctionId,
-        address indexed publisher,
-        string tokenGroup,
-        uint256 tokenId,
-        uint256 startPrice,
-        uint256 timeStart,
-        uint256 timeEnd,
-        uint256 timeEndToken,
-        uint256 timestamp
-    );
-    event AuctionCancel(
-        uint256 indexed auctionId,
-        address indexed publisher,
-        uint256 timestamp
-    );
-    event AuctionExpire(
-        uint256 indexed auctionId,
-        address indexed publisher,
-        uint256 timestamp
-    );
-    event AuctionSuccess(
-        uint256 indexed auctionId,
-        address indexed publisher,
-        address indexed advertiser,
-        uint256 bidPrice,
-        uint256 timestamp
-    );
-
-    struct Auction {
-        address publisher;
-        address advertiser;
-        string tokenGroup;
+    
+    struct SellerNFTSetting {
         uint256 tokenId;
-        uint256 startPrice;
-        uint256 timeStart;
-        uint256 timeEnd;
-        uint256 timeEndToken;
-        uint256 bidPrice;
-        AuctionState state;
+        address seller;
+        uint8 autoApprove;
+        uint256 inProgressCount;
     }
+    mapping (uint256 => SellerNFTSetting) private _sellerNFTSettings; 
 
-    mapping (uint256 => Auction) private _auctions;
+    event SellerNFTDeposit(uint256 indexed tokenId, address seller, uint8 autoApprove);
+    event SellerNFTUpdate(uint256 indexed tokenId, uint8 autoApprove, uint256 inProgressCount);
+    event SellerNFTWithdraw(uint256 indexed tokenId);
 
-    // Hash timelock contract section
-    enum ContractState {
-        START,
-        WITHDRAW,
-        REFUND,
-        CANCEL
+    struct SellerAuction {
+        address seller;
+        uint256 tokenId;
+        uint256 auctionTimeStart;
+        uint256 auctionTimeEnd;
+        uint256 contractTimeStart;
+        uint256 contractTimeEnd;
+        uint256 priceStart;
+        uint256 pricePending;
+        uint256 priceEnd;
+        uint256 buyerCampaign;
+        uint8 buyerCampaignApproved;
     }
-    event ContractStart(
-        uint256 indexed contractId,
-        address indexed publisher, 
-        address indexed advertiser,
-        string tokenGroup,
+    mapping (uint256 => SellerAuction) private _sellerAuctions; 
+
+    event SellerAuctionCreate(
+        uint256 indexed sellerAuctionId, 
+        address seller,
         uint256 tokenId,
-        uint256 amount,
-        uint256 timelock,
-        uint256 timestamp
+        uint256 auctionTimeStart,
+        uint256 auctionTimeEnd,
+        uint256 contractTimeStart,
+        uint256 contractTimeEnd,
+        uint256 priceStart,
+        uint8 buyerCampaignApproved
     );
-    event ContractSetHashlock(
-        uint256 indexed contractId,
-        bytes32 hashlock,
-        uint32 totalShares,
-        uint256 timestamp
+    event SellerAuctionCancel(uint256 indexed sellerAuctionId);
+    event SellerAuctionBuyerCampaignNew(
+        uint256 indexed sellerAuctionId, 
+        uint256 buyerCampaignId,
+        uint256 pricePending
     );
-    event ContractSetShare(
-        uint256 indexed contractId,
-        string share,
-        uint256 timestamp
-    );
-    event ContractCancel(
-        uint256 indexed contractId,
-        uint256 timestamp
-    );
-    event ContractWithdraw(
-        uint256 indexed contractId,
-        uint256 timestamp
-    );
-    event ContractRefund(
-        uint256 indexed contractId,
-        uint256 timestamp
+    event SellerAuctionBuyerCampaignBuyerCancel(uint256 indexed sellerAuctionId);
+    event SellerAuctionBuyerCampaignApprove( uint256 indexed sellerAuctionId, uint256 priceEnd);
+    event SellerAuctionBuyerCampaignReject( uint256 indexed sellerAuctionId);
+
+    struct BuyerCampaign {
+        address buyer;
+        string uri;
+    }
+    mapping (uint256 => BuyerCampaign) private _buyerCampaigns;
+
+    event BuyerCampaignCreate(
+        uint256 indexed buyerCampaignId, 
+        address buyer, 
+        string uri
     );
 
     struct Contract {
-        address publisher;
-        address advertiser;
-        string tokenGroup;
-        uint256 tokenId;
-        uint256 amount;
-        bytes32 hashlock;
-        uint256 timelock;
-        string[] shares;
-        uint32 totalShares;
-        ContractState state;
+        uint256 sellerAuctionId;
+        uint256 buyerCampaignId;
+        uint256 contractTimeStart;
+        uint256 contractTimeEnd;
+        uint256 contractValue;
+        uint8 withdrawn;
     }
 
-    mapping (uint256 => Contract) private _contracts;
+    mapping (uint256 => Contract) private _contracts; 
 
+    event ContractCreate (
+        uint256 indexed contractId,
+        uint256 sellerAuctionId,
+        uint256 buyerCampaignId,
+        uint256 contractTimeStart,
+        uint256 contractTimeEnd,
+        uint256 contractValue
+    );
+    event ContractWithdraw(uint256 indexed contractId);
 
-    function getTokenAddress() external view returns (address) {
-        return _tokenAddress;
+    function getERC20Address() public view returns (address) {
+        return _erc20Address;
     }
 
-    function getNFTAddress() external view returns (address) {
-        return _NFTAddress;
+    function getSellerNFTSetting(uint256 _tokenId) 
+        public 
+        view
+        returns (
+            uint256 tokenId,
+            address seller,
+            uint8 autoApprove,
+            uint256 inProgressCount
+        ) 
+    {
+        tokenId = _sellerNFTSettings[_tokenId].tokenId;
+        seller = _sellerNFTSettings[_tokenId].seller;
+        autoApprove = _sellerNFTSettings[_tokenId].autoApprove;
+        inProgressCount = _sellerNFTSettings[_tokenId].inProgressCount;
     }
 
-    function getValidator() external view returns (address) {
-        return _validator;
-    }
-
-    function getAuction(uint256 _auctionId) public view returns (
-        address,
-        address,
-        string memory,
-        uint256,
-        uint256,
-        uint256,
-        uint256,
-        uint256,
-        uint256,
-        AuctionState
-    ) {
-        Auction storage a = _auctions[_auctionId];
-
-        return (
-            a.publisher,
-            a.advertiser,
-            a.tokenGroup,
-            a.tokenId,
-            a.startPrice,
-            a.timeStart,
-            a.timeEnd,
-            a.timeEndToken,
-            a.bidPrice,
-            a.state
-        );
-    }
-
-    function getContract(uint256 _contractId) public view returns (
-        address,
-        address,
-        string memory,
-        uint256,
-        uint256,
-        bytes32,
-        uint256,
-        string[] memory,
-        uint32,
-        ContractState
-    ) {
-        Contract storage c = _contracts[_contractId];
-
-        return (
-            c.publisher,
-            c.advertiser,
-            c.tokenGroup,
-            c.tokenId,
-            c.amount,
-            c.hashlock,
-            c.timelock,
-            c.shares,
-            c.totalShares,
-            c.state
-        );
-    }
-
-    function auctionStart(
-        uint256 _tokenId,
-        uint256 _startPrice,
-        uint256 _timeEnd
-    ) public {
-        require(
-            _zestyNFT.getApproved(_tokenId) == address(this),
-            "Contract is not approved to manage the token"
-        );
-        require(
-            _startPrice > 0,
-            "Starting Price of the Dutch auction must be greater than 0"
-        );
-        require(
-            _timeEnd > block.timestamp,
-            "Ending time of the Dutch auction must be in the future"
-        );
-
-        string memory _tokenGroup;
-        address _publisher;
-        uint256 _timeCreated;
-        uint256 _timeStartToken;
-        uint256 _timeEndToken;
-        string memory _uri;
-
-        (_tokenGroup,
-         _publisher,
-         _timeCreated,
-         _timeStartToken,
-         _timeEndToken,
-         _uri) = _zestyNFT.getTokenData(_tokenId);
-
-        require(
-            _timeEndToken > _timeEnd,
-            "Ending time of auction is later than expiry of token"
-        );
-
-        _zestyNFT.safeTransferFrom(_msgSender(), address(this), _tokenId);
-
-        _auctions[_auctionCount] = Auction(
-            _publisher,
-            address(0),
-            _tokenGroup,
-            _tokenId,
-            _startPrice,
-            block.timestamp,
-            _timeEnd,
-            _timeEndToken,
-            uint256(0),
-            AuctionState.START
-         );
-
-        emit AuctionStart(
-            _auctionCount,
-            _publisher,
-            _tokenGroup,
-            _tokenId,
-            _startPrice,
-            block.timestamp,
-            _timeEnd,
-            _timeEndToken,
-            block.timestamp
-        );
-        _auctionCount = _auctionCount.add(1);
-    }
-
-    function auctionCancel(uint256 _auctionId) public {
-        Auction storage a = _auctions[_auctionId];
-
-        require(a.state == AuctionState.START, "Auction is not in START state");
-        require(_msgSender() == a.publisher, "Not publisher");
-
-        if (block.timestamp < a.timeEnd) {
-            a.state = AuctionState.CANCEL;
-            emit AuctionCancel(
-                _auctionId,
-                a.publisher,
-                block.timestamp
-            );
-        } else {
-            a.state = AuctionState.EXPIRE;
-            emit AuctionExpire(
-                _auctionId,
-                a.publisher,
-                block.timestamp
-            );
-        }
-        _zestyNFT.safeTransferFrom(address(this), _msgSender(), a.tokenId);
-    }
-
-    function auctionBid(uint256 _auctionId) public {
-        Auction storage a = _auctions[_auctionId];
+    function getSellerAuctionPrice(uint256 _sellerAuctionId) public view returns (uint256) {
+        SellerAuction storage s = _sellerAuctions[_sellerAuctionId];
         uint256 timeNow = block.timestamp;
+        uint256 timeTotal = s.contractTimeEnd.sub(s.auctionTimeStart);
+        uint256 rescalePriceStart = s.priceStart.mul(100000);
+        uint256 gradient = rescalePriceStart.div(timeTotal);
 
-        require(a.state == AuctionState.START, "Auction is not available for bidding");
-        require(a.publisher != _msgSender(), "Cannot bid on own auction");
-        require(timeNow < a.timeEnd, "Auction has expired");
-
-        uint256 timePassed = timeNow.sub(a.timeStart);
-        uint256 timeTotal = a.timeEndToken.sub(a.timeStart);
-
-        // rescale the values to accomodate decimals
-        uint256 reStartPrice = a.startPrice.mul(100000);
-        uint256 gradient = reStartPrice.div(timeTotal);
-
-        uint256 bidPrice = reStartPrice.sub(gradient.mul(timePassed)).div(100000);
-
-        if(!_zestyToken.transferFrom(_msgSender(), address(this), bidPrice)) {
-            revert("Transfer $ZEST failed, check if sufficient allowance is provided");
-        }
-
-        a.state = AuctionState.SUCCESS;
-        a.bidPrice = bidPrice;
-        a.advertiser = _msgSender();
-
-        emit AuctionSuccess(
-            _auctionId,
-            a.publisher,
-            a.advertiser,
-            a.bidPrice,
-            timeNow
-        );
-
-        // create contract
-        Contract storage c = _contracts[_contractCount];
-        c.publisher = a.publisher;
-        c.advertiser = a.advertiser;
-        c.tokenGroup = a.tokenGroup;
-        c.tokenId = a.tokenId;
-        c.amount = a.bidPrice;
-        c.timelock = a.timeEndToken.add(86400); // add 24 hrs to the end of ad slot
-        c.state = ContractState.START;
-
-        emit ContractStart(
-            _contractCount,
-            c.publisher,
-            c.advertiser,
-            c.tokenGroup,
-            c.tokenId,
-            c.amount,
-            c.timelock,
-            timeNow
-        );
-
-        _contractCount = _contractCount.add(1);
+        return rescalePriceStart.sub(gradient.mul(timeNow.sub(s.auctionTimeStart))).div(100000);
     }
 
-    function contractSetTokenURI(uint256 _contractId, string memory _uri) public { 
-        Contract storage c = _contracts[_contractId];
-        require(c.publisher != address(0), "Contract does not exist");
-        require(c.state == ContractState.START, "Contract already ended");
-        require(c.advertiser == _msgSender(), "Not advertiser");
-        _zestyNFT.setTokenURI(c.tokenId, _uri);
+    function getSellerAuction(uint256 _sellerAuctionId) 
+        public 
+        view 
+        returns (
+            address seller,
+            uint256 tokenId,
+            uint256 auctionTimeStart,
+            uint256 auctionTimeEnd,
+            uint256 contractTimeStart,
+            uint256 contractTimeEnd,
+            uint256 priceStart,
+            uint256 pricePending,
+            uint256 priceEnd,
+            uint256 buyerCampaign,
+            uint8 buyerCampaignApproved
+        )
+    {
+        seller = _sellerAuctions[_sellerAuctionId].seller;
+        tokenId = _sellerAuctions[_sellerAuctionId].tokenId;
+        auctionTimeStart = _sellerAuctions[_sellerAuctionId].auctionTimeStart;
+        auctionTimeEnd = _sellerAuctions[_sellerAuctionId].auctionTimeEnd;
+        contractTimeStart = _sellerAuctions[_sellerAuctionId].contractTimeStart;
+        contractTimeEnd = _sellerAuctions[_sellerAuctionId].contractTimeEnd;
+        priceStart = _sellerAuctions[_sellerAuctionId].priceStart;
+        pricePending = _sellerAuctions[_sellerAuctionId].pricePending;
+        priceEnd = _sellerAuctions[_sellerAuctionId].priceEnd;
+        buyerCampaign = _sellerAuctions[_sellerAuctionId].buyerCampaign;
+        buyerCampaignApproved = _sellerAuctions[_sellerAuctionId].buyerCampaignApproved;
     }
 
-    function contractSetHashlock(
-        uint256 _contractId, 
-        bytes32 _hashlock, 
-        uint32 _totalShares
-    ) public {
-        require(_msgSender() == _validator, "Not validator");
+    function getBuyerCampaign(uint256 _buyerCampaignId)
+        public
+        view
+        returns (
+            address buyer,
+            string memory uri
+        )
+    {
+        buyer = _buyerCampaigns[_buyerCampaignId].buyer;
+        uri = _buyerCampaigns[_buyerCampaignId].uri;
+    }
 
-        Contract storage c = _contracts[_contractId];
+    function getContract(uint256 _contractId)
+        public
+        view
+        returns (
+            uint256 sellerAuctionId,
+            uint256 buyerCampaignId,
+            uint256 contractTimeStart,
+            uint256 contractTimeEnd,
+            uint256 contractValue,
+            uint8 withdrawn
+        )
+    {
+        sellerAuctionId = _contracts[_contractId].sellerAuctionId;
+        buyerCampaignId = _contracts[_contractId].buyerCampaignId;
+        contractTimeStart = _contracts[_contractId].contractTimeStart;
+        contractTimeEnd = _contracts[_contractId].contractTimeEnd;
+        contractValue = _contracts[_contractId].contractValue;
+        withdrawn = _contracts[_contractId].withdrawn;
+    }
 
-        require(c.publisher != address(0), "Contract does not exist");
-        require(c.hashlock == 0x0, "Hashlock already set");
-        require(c.state == ContractState.START, "Contract already ended");
+    /* 
+     * Buyer logic
+     */
 
-        c.hashlock = _hashlock;
-        c.totalShares = _totalShares;
+    function buyerCampaignCreate(string memory _uri) external {
+        _buyerCampaigns[_buyerCampaignCount] = BuyerCampaign(
+            msg.sender,
+            _uri
+        );
+        emit BuyerCampaignCreate(
+            _buyerCampaignCount,
+            msg.sender,
+            _uri
+        );
+        _buyerCampaignCount = _buyerCampaignCount.add(1);
+    }
 
-        emit ContractSetHashlock(
-            _contractId, 
-            c.hashlock,
-            c.totalShares,
-            block.timestamp
+    /* 
+     * Seller logic
+     */
+    function sellerNFTDeposit(
+        uint256 _tokenId,
+        uint8 _autoApprove
+    ) 
+        external 
+        nonReentrant
+    {
+        require(
+            _autoApprove == _TRUE || _autoApprove == _FALSE,
+            "ZestyMarket_ERC20_V1::sellerNFTDeposit: _autoApprove must be uint8 1 (FALSE) or 2 (TRUE)"
+        );
+        _depositZestyNFT(_tokenId);
+
+        _sellerNFTSettings[_tokenId] = SellerNFTSetting(
+            _tokenId,
+            msg.sender, 
+            _autoApprove,
+            0
+        );
+
+        emit SellerNFTDeposit(
+            _tokenId,
+            msg.sender,
+            _autoApprove
         );
     }
 
-    function contractSetShare(uint256 _contractId, string memory _share) public {
-        require(_msgSender() == _validator, "Not validator");
-        Contract storage c = _contracts[_contractId];
+    function sellerNFTWithdraw(uint256 _tokenId) external onlyDepositor(_tokenId) nonReentrant {
+        SellerNFTSetting storage s = _sellerNFTSettings[_tokenId];
+        require(
+            s.inProgressCount == 0, 
+            "ZestyMarket_ERC20_V1::sellerNFTWithdraw Auction or Contact is in progress withdraw"
+        );
+        _withdrawZestyNFT(_tokenId);
+        delete _sellerNFTSettings[_tokenId];
+        emit SellerNFTWithdraw(_tokenId);
+    }
 
-        require(c.publisher != address(0), "Contract does not exist");
-        require(c.hashlock != 0x0, "Hashlock has not been set");
-        require(c.state == ContractState.START, "Contract already ended");
+    function sellerNFTUpdate(
+        uint256 _tokenId,
+        uint8 _autoApprove
+    ) 
+        external
+        onlyDepositorOrOperator(_tokenId)
+    {
+        require(
+            _autoApprove == _TRUE || _autoApprove == _FALSE,
+            "ZestyMarket_ERC20_V1::sellerNFTUpdate _autoApprove must be uint8 1 (FALSE) or 2 (TRUE)"
+        );
+        SellerNFTSetting storage s = _sellerNFTSettings[_tokenId];
+        s.autoApprove = _autoApprove;
 
-        // does not check for validity of share
-        // the checking will be done offchain through publicly veriable secret sharing
-        c.shares.push(_share);
-
-        emit ContractSetShare(
-            _contractId, 
-            _share,
-            block.timestamp
+        emit SellerNFTUpdate(
+            _tokenId,
+            _autoApprove,
+            s.inProgressCount
         );
     }
 
-    function contractRefund(uint256 _contractId) public {
-        Contract storage c = _contracts[_contractId];
-        require(c.publisher != address(0), "Contract does not exist");
-        require(_msgSender() == c.advertiser, "Not advertiser");
-        // check for shares length and totalShares, 
-        // if it's 0 that means the validator malfunctioned
-        // else prevent refund because availability threshold is reached 
-        // % of byzantine validators < availability threshold. 
-        // Otherwise this refund could be invalid as the shares could be withheld 
-        // by a byzantine node
-        if (c.shares.length != 0 && c.totalShares != 0) {
+    function sellerAuctionCreateBatch(
+        uint256 _tokenId,
+        uint256[] memory _auctionTimeStart,
+        uint256[] memory _auctionTimeEnd,
+        uint256[] memory _contractTimeStart,
+        uint256[] memory _contractTimeEnd,
+        uint256[] memory _priceStart
+    ) 
+        external 
+        onlyDepositorOrOperator(_tokenId)
+    {
+        require(
+            _auctionTimeStart.length == _auctionTimeEnd.length && 
+            _auctionTimeEnd.length == _contractTimeStart.length &&
+            _contractTimeStart.length == _contractTimeEnd.length &&
+            _contractTimeEnd.length == _priceStart.length,
+            "ZestyMarket_ERC20_V1::sellerAuctionCreateBatch: Array length not equal"
+        );
+
+        address _seller = getDepositor(_tokenId);
+
+        for (uint i=0; i < _auctionTimeStart.length; i++) {
             require(
-                c.shares.length < c.totalShares.mul(_availabilityThreshold).div(10000), 
-                "Availability threshold reached"
+                _priceStart[i] > 0, 
+                "ZestyMarket_ERC20_V1::sellerAuctionCreateBatch: Starting Price of the Auction must be greater than 0"
+            );
+            require(
+                _auctionTimeStart[i] > block.timestamp,
+                "ZestyMarket_ERC20_V1::sellerAuctionCreateBatch: Starting time of the Auction must be greater than current block timestamp"
+            );
+            require(
+                _auctionTimeEnd[i] > _auctionTimeStart[i],
+                "ZestyMarket_ERC20_V1::sellerAuctionCreateBatch: Ending time of the Auction must be greater than the starting time of Auction"
+            );
+            require(
+                _contractTimeStart[i] > _auctionTimeStart[i],
+                "ZestyMarket_ERC20_V1::sellerAuctionCreateBatch: Starting time of the Contract must be greater than the starting time of Auction"
+            );
+            require(
+                _contractTimeEnd[i] > _auctionTimeStart[i],
+                "ZestyMarket_ERC20_V1::sellerAuctionCreateBatch: Ending time of the Contract must be greater than the starting time of Contract"
+            );
+            require(
+                _contractTimeEnd[i] > _auctionTimeEnd[i],
+                "ZestyMarket_ERC20_V1::sellerAuctionCreateBatch: Ending time of the Contract must be greater than the ending time of Auction"
+            );
+
+            SellerNFTSetting storage s = _sellerNFTSettings[_tokenId];
+            s.inProgressCount = s.inProgressCount.add(1);
+
+            emit SellerNFTUpdate(
+                _tokenId,
+                s.autoApprove,
+                s.inProgressCount
+            );
+
+            
+            _sellerAuctions[_sellerAuctionCount] = SellerAuction(
+                _seller,
+                _tokenId,
+                _auctionTimeStart[i],
+                _auctionTimeEnd[i],
+                _contractTimeStart[i],
+                _contractTimeEnd[i],
+                _priceStart[i],
+                0,
+                0,
+                0,
+                s.autoApprove
+            );
+
+            emit SellerAuctionCreate(
+                _sellerAuctionCount,
+                _seller,
+                _tokenId,
+                _auctionTimeStart[i],
+                _auctionTimeEnd[i],
+                _contractTimeStart[i],
+                _contractTimeEnd[i],
+                _priceStart[i],
+                s.autoApprove
+            );
+
+            _sellerAuctionCount = _sellerAuctionCount.add(1);
+        }
+    }
+
+    function sellerAuctionCancelBatch(uint256[] memory _sellerAuctionId) external {
+        for(uint i=0; i < _sellerAuctionId.length; i++) {
+            SellerAuction storage s = _sellerAuctions[_sellerAuctionId[i]];
+            require(
+                s.seller != address(0), 
+                "ZestyMarket_ERC20_V1::sellerAuctionCancelBatch: Seller Auction is invalid"
+            );
+            require(
+                s.seller == msg.sender || isOperator(s.seller, msg.sender), 
+                "ZestyMarket_ERC20_V1::sellerAuctionCancelBatch: Not seller or operator for seller"
+            );
+            require(
+                s.buyerCampaign == 0,
+                "ZestyMarket_ERC20_V1::sellerAuctionCancelBatch: Reject buyer campaign before cancelling"
+            );
+            delete _sellerAuctions[_sellerAuctionId[i]];
+
+            SellerNFTSetting storage se = _sellerNFTSettings[s.tokenId];
+            se.inProgressCount = se.inProgressCount.sub(1);
+            emit SellerAuctionCancel(_sellerAuctionId[i]);
+            emit SellerNFTUpdate(
+                se.tokenId,
+                se.autoApprove,
+                se.inProgressCount
             );
         }
-        require(c.state == ContractState.START, "Contract already ended");
-        // We still keep a timelock in the event the advertiser is still delivering the adslot
-        // but have yet to receive sufficient share
-        require(c.timelock < block.timestamp, "Timelock not yet passed"); 
-
-        c.state = ContractState.REFUND;
-        // refund advertiser
-        _zestyToken.transfer(c.advertiser, c.amount);
-
-        // return NFT to publisher
-        _zestyNFT.safeTransferFrom(address(this), c.publisher, c.tokenId);
-
-        emit ContractRefund(
-            _contractId,
-            block.timestamp
-        );
     }
 
-    function contractWithdraw(uint256 _contractId, bytes32 _preimage) public {
-        Contract storage c = _contracts[_contractId];
-        require(c.publisher != address(0), "Contract does not exist");
-        require(_msgSender() == c.publisher, "Not publisher");
-        require(
-            c.shares.length >= c.totalShares.mul(_availabilityThreshold).div(10000), 
-            "Availability threshold not reached"
-        );
-        require(c.state == ContractState.START, "Contract already ended");
-        // We still use a hashlock as a final check because length of shares
-        // is insufficient to demonstrate that the advertisement has been served
-        // possibility of malicious nodes in multi public validator system
-        require(
-            c.hashlock == keccak256(abi.encodePacked(_preimage)), 
-            "Hashlock does not match"
-        );
+    function sellerAuctionBidBatch(uint256[] memory _sellerAuctionId, uint256 _buyerCampaignId) external nonReentrant {
+        for (uint i=0; i < _sellerAuctionId.length; i++) {
+            SellerAuction storage s = _sellerAuctions[_sellerAuctionId[i]];
+            BuyerCampaign storage b = _buyerCampaigns[_buyerCampaignId];
+            require(
+                block.timestamp >= s.auctionTimeStart, 
+                "ZestyMarket_ERC20_V1::sellerAuctionBidBatch: Auction has yet to start"
+            );
+            require(
+                s.auctionTimeEnd >= block.timestamp, 
+                "ZestyMarket_ERC20_V1::sellerAuctionBidBatch: Auction has ended"
+            );
+            require(
+                s.seller != address(0), 
+                "ZestyMarket_ERC20_V1::sellerAuctionBidBatch: Seller Auction is invalid"
+            );
+            require(
+                s.seller != msg.sender, 
+                "ZestyMarket_ERC20_V1::sellerAuctionBidBatch: Cannot bid on own auction"
+            );
+            require(
+                s.buyerCampaign == 0, 
+                "ZestyMarket_ERC20_V1::sellerAuctionBidBatch: Already has a bid"
+            );
+            require(
+                b.buyer != address(0), 
+                "ZestyMarket_ERC20_V1::sellerAuctionBidBatch: Buyer Campaign is invalid"
+            );
+            require(
+                b.buyer == msg.sender || isOperator(b.buyer, msg.sender), 
+                "ZestyMarket_ERC20_V1::sellerAuctionBidBatch: Not buyer or operator for buyer"
+            );
 
-        c.state = ContractState.WITHDRAW;
-    
-        uint256 burnAmount = c.amount.mul(_burnPerc).div(10000);
-        uint256 valAmount = c.amount.mul(_validatorPerc).div(10000);
-        uint256 remaining = c.amount.sub(burnAmount).sub(valAmount);
+            s.buyerCampaign = _buyerCampaignId;
 
-        // burn tokens
-        _zestyToken.burn(burnAmount);
+            uint256 price = getSellerAuctionPrice(_sellerAuctionId[i]);
+            require(
+                price > 0, 
+                "ZestyMarket_ERC20_V1::sellerAuctionBidBatch: Auction has expired"
+            );
+            s.pricePending = price;
 
-        // give some to validators
-        _zestyToken.transfer(_validator, valAmount);
+            require(
+                IERC20(_erc20Address).transferFrom(b.buyer, address(this), price),
+                "ZestyMarket_ERC20_V1::sellerAuctionBidBatch Transfer of ERC20 failed, check if sufficient allowance is provided"
+            );
 
-        // give rest to publisher
-        _zestyToken.transfer(c.publisher, remaining);
+            emit SellerAuctionBuyerCampaignNew(
+                _sellerAuctionId[i],
+                _buyerCampaignId,
+                price
+            );
 
-        // Give advertiser NFT for collection
-        _zestyNFT.safeTransferFrom(address(this), c.advertiser, c.tokenId);
+            // if auto approve is set to true
+            if (s.buyerCampaignApproved == _TRUE) {
+                _contracts[_contractCount] = Contract(
+                    _sellerAuctionId[i],
+                    _buyerCampaignId,
+                    s.contractTimeStart,
+                    s.contractTimeEnd,
+                    price,
+                    _FALSE
+                );
 
-        emit ContractRefund(
-            _contractId,
-            block.timestamp
-        );
+                emit SellerAuctionBuyerCampaignApprove( _sellerAuctionId[i], price);
+                emit ContractCreate(
+                    _contractCount,
+                    _sellerAuctionId[i],
+                    _buyerCampaignId,
+                    s.contractTimeStart,
+                    s.contractTimeEnd,
+                    price
+                );
+                _contractCount = _contractCount.add(1);
+            }
+        }
     }
 
-    function contractCancel(uint256 _contractId) public {
-        Contract storage c = _contracts[_contractId];
-        require(c.publisher != address(0), "Contract does not exist");
-        require(c.state == ContractState.START, "Contract already ended");
-        require(c.publisher == _msgSender(), "Not publisher");
+    function sellerAuctionBidCancelBatch(uint256[] memory _sellerAuctionId) external nonReentrant {
+        for (uint i=0; i < _sellerAuctionId.length; i++) {
+            BuyerCampaign storage b = _buyerCampaigns[_sellerAuctions[_sellerAuctionId[i]].buyerCampaign];
+            require(
+                _sellerAuctions[_sellerAuctionId[i]].seller != address(0), 
+                "ZestyMarket_ERC20_V1::sellerAuctionBidCancelBatch: Seller Auction is invalid");
+            require(
+                msg.sender == b.buyer || isOperator(b.buyer, msg.sender), 
+                "ZestyMarket_ERC20_V1::sellerAuctionBidCancelBatch: Not buyer or operator for buyer"
+            );
+            require(
+                _sellerAuctions[_sellerAuctionId[i]].buyerCampaignApproved == _FALSE, 
+                "ZestyMarket_ERC20_V1::sellerAuctionBidCancelBatch: Seller has approved"
+            );
 
-        c.state = ContractState.CANCEL;
+            uint256 pricePending = _sellerAuctions[_sellerAuctionId[i]].pricePending;
+            _sellerAuctions[_sellerAuctionId[i]].pricePending = 0;
+            _sellerAuctions[_sellerAuctionId[i]].buyerCampaign = 0;
 
-        // Return the advertiser money
-        _zestyToken.transfer(c.advertiser, c.amount);
+            require(
+                IERC20(_erc20Address).transfer(b.buyer, pricePending),
+                "ZestyMarket_ERC20_V1::sellerAuctionBidCancelBatch: Transfer of ERC20 failed"
+            );
 
-        // Return the publisher the NFT
-        _zestyNFT.safeTransferFrom(address(this), c.publisher, c.tokenId);
-
-        emit ContractCancel(
-            _contractId,
-            block.timestamp
-        );
+            emit SellerAuctionBuyerCampaignBuyerCancel(_sellerAuctionId[i]);
+        }
     }
 
-    function onERC721Received(address, address, uint256, bytes memory) public override returns (bytes4) {
-        return this.onERC721Received.selector;
+    function sellerAuctionApproveBatch(uint256[] memory _sellerAuctionId) external nonReentrant {
+        for (uint i=0; i < _sellerAuctionId.length; i++) {
+            SellerAuction storage s = _sellerAuctions[_sellerAuctionId[i]];
+            require(
+                s.seller != address(0), 
+                "ZestyMarket_ERC20_V1::sellerAuctionApproveBatch: Seller auction is invalid"
+            );
+            require(
+                s.seller == msg.sender || isOperator(s.seller, msg.sender), 
+                "ZestyMarket_ERC20_V1::sellerAuctionApproveBatch: Not seller or operator for seller"
+            );
+            require(
+                s.buyerCampaign != 0, 
+                "ZestyMarket_ERC20_V1::sellerAuctionApproveBatch: Does not have a bid"
+            );
+            require(
+                s.buyerCampaignApproved == _FALSE, 
+                "ZestyMarket_ERC20_V1::sellerAuctionApproveBatch: Already approved"
+            );
+
+            uint256 price = getSellerAuctionPrice(_sellerAuctionId[i]);
+            require(
+                price > 0, 
+                "ZestyMarket_ERC20_V1::sellerAuctionApproveBatch: Auction has expired"
+            );
+
+            s.priceEnd = price;
+            uint256 priceDiff = s.pricePending.sub(s.priceEnd);
+            s.pricePending = 0;
+
+            require(
+                IERC20(_erc20Address).transfer(_buyerCampaigns[s.buyerCampaign].buyer, priceDiff),
+                "ZestyMarket_ERC20_V1::sellerAuctionApproveBatch: Transfer of ERC20 failed"
+            );
+
+            s.buyerCampaignApproved = _TRUE;
+            _contracts[_contractCount] = Contract(
+                _sellerAuctionId[i],
+                s.buyerCampaign,
+                s.contractTimeStart,
+                s.contractTimeEnd,
+                s.priceEnd,
+                _FALSE
+            );
+
+            emit SellerAuctionBuyerCampaignApprove( _sellerAuctionId[i], s.priceEnd);
+            emit ContractCreate(
+                _contractCount,
+                _sellerAuctionId[i],
+                s.buyerCampaign,
+                s.contractTimeStart,
+                s.contractTimeEnd,
+                s.priceEnd
+            );
+            _contractCount = _contractCount.add(1);
+        }
+    }
+
+    function sellerAuctionRejectBatch(uint256[] memory _sellerAuctionId) external nonReentrant {
+        for (uint i=0; i < _sellerAuctionId.length; i++) {
+            SellerAuction storage s = _sellerAuctions[_sellerAuctionId[i]];
+            require(
+                s.seller != address(0), 
+                "ZestyMarket_ERC20_V1::sellerAuctionRejectBatch: Seller auction is invalid"
+            );
+            require(
+                s.seller == msg.sender || isOperator(s.seller, msg.sender), 
+                "ZestyMarket_ERC20_V1::sellerAuctionRejectBatch: Not seller or operator for seller"
+            );
+            require(
+                s.buyerCampaign != 0, 
+                "ZestyMarket_ERC20_V1::sellerAuctionRejectBatch: Does not have a bid"
+            );
+            require(
+                s.buyerCampaignApproved == _FALSE,
+                "ZestyMarket_ERC20_V1::sellerAuctionRejectBatch: Already approved"
+            );
+
+            uint256 pricePending = s.pricePending;
+            s.pricePending = 0;
+
+            require(
+                IERC20(_erc20Address).transfer(_buyerCampaigns[s.buyerCampaign].buyer, pricePending),
+                "ZestyMarket_ERC20_V1::sellerAuctionRejectBatch: Transfer of ERC20 failed"
+            );
+
+            s.buyerCampaign = 0;
+
+            emit SellerAuctionBuyerCampaignReject(_sellerAuctionId[i]);
+        }
+    }
+
+    function contractWithdrawBatch(uint256[] memory _contractId) external nonReentrant {
+        for(uint i=0; i < _contractId.length; i++) {
+            Contract storage c = _contracts[_contractId[i]];
+            SellerAuction storage s = _sellerAuctions[c.sellerAuctionId];
+
+            require(
+                s.seller == msg.sender || isOperator(s.seller, msg.sender), 
+                "ZestyMarket_ERC20_V1::contractWithdrawBatch: Not seller or operator"
+            );
+            require(
+                c.sellerAuctionId != 0 || c.buyerCampaignId != 0,
+                "ZestyMarket_ERC20_V1::contractWithdrawBatch: Invalid contract"
+            );
+            require(
+                block.timestamp > c.contractTimeEnd, 
+                "ZestyMarket_ERC20_V1::contractWithdrawBatch: Contract has not ended"
+            );
+            require(
+                c.withdrawn == _FALSE, 
+                "ZestyMarket_ERC20_V1::contractWithdrawBatch: Already withdrawn"
+            );
+
+            c.withdrawn = _TRUE;
+
+            require(
+                IERC20(_erc20Address).transfer(s.seller, c.contractValue),
+                "ZestyMarket_ERC20_V1::contractWithdrawBatch: Transfer of ERC20 failed"
+
+            );
+
+            SellerNFTSetting storage se = _sellerNFTSettings[s.tokenId];
+            se.inProgressCount = se.inProgressCount.sub(1);
+
+            emit SellerNFTUpdate(
+                se.tokenId,
+                se.autoApprove,
+                se.inProgressCount
+            );
+
+            emit ContractWithdraw(_contractId[i]);
+        }
     }
 }

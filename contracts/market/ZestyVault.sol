@@ -77,7 +77,7 @@ abstract contract ZestyVault is Context, IERC721Receiver {
     function _depositZestyNFT(uint256 _tokenId) internal virtual {
         require(
             _zestyNFT.getApproved(_tokenId) == address(this),
-            "ZestyVault: Contract is not approved to manage token"
+            "ZestyVault::_depositZestyNFT: Contract is not approved to manage token"
         );
 
         _nftDeposits[_tokenId] = _msgSender();
@@ -102,7 +102,7 @@ abstract contract ZestyVault is Context, IERC721Receiver {
     modifier onlyDepositor(uint256 _tokenId) {
         require(
             getDepositor(_tokenId) == _msgSender(),
-            "ZestyVault: Not depositor"
+            "ZestyVault::onlyDepositor: Not depositor"
         );
         _;
     }
@@ -110,7 +110,7 @@ abstract contract ZestyVault is Context, IERC721Receiver {
     modifier onlyOperator(uint256 _tokenId) {
         require(
             getOperator(getDepositor(_tokenId)) == _msgSender(),
-            "ZestyVault: Not operator"
+            "ZestyVault::onlyOperator: Not operator"
         );
         _;
     }
@@ -119,7 +119,7 @@ abstract contract ZestyVault is Context, IERC721Receiver {
         require(
             getDepositor(_tokenId) == _msgSender() 
             || getOperator(getDepositor(_tokenId)) == _msgSender(),
-            "ZestyVault: Not depositor or operator"
+            "ZestyVault::onlyDepositorOrOperator: Not depositor or operator"
         );
         _;
     }
