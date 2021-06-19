@@ -7,11 +7,12 @@ import "../utils/ReentrancyGuard.sol";
 import "../interfaces/IERC20.sol";
 import "./ZestyVault.sol";
 
-contract ZestyMarket_ERC20_V2_1 is ZestyVault, ReentrancyGuard {
+contract ZestyMarket_ERC20_V2 is ZestyVault, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeMath for uint32;
 
     address private _erc20Address;
+    address private _validator;
     uint256 private _buyerCampaignCount = 1; // 0 is used null values
     uint256 private _sellerAuctionCount = 1; // 0 is used for null values
     uint256 private _contractCount = 1;
@@ -108,12 +109,12 @@ contract ZestyMarket_ERC20_V2_1 is ZestyVault, ReentrancyGuard {
     );
     event ContractWithdraw(uint256 indexed contractId);
 
-    function getERC20Address() public view returns (address) {
+    function getERC20Address() external view returns (address) {
         return _erc20Address;
     }
 
     function getSellerNFTSetting(uint256 _tokenId) 
-        public 
+        external 
         view
         returns (
             uint256 tokenId,
@@ -139,7 +140,7 @@ contract ZestyMarket_ERC20_V2_1 is ZestyVault, ReentrancyGuard {
     }
 
     function getSellerAuction(uint256 _sellerAuctionId) 
-        public 
+        external 
         view 
         returns (
             address seller,
@@ -169,7 +170,7 @@ contract ZestyMarket_ERC20_V2_1 is ZestyVault, ReentrancyGuard {
     }
 
     function getBuyerCampaign(uint256 _buyerCampaignId)
-        public
+        external
         view
         returns (
             address buyer,
@@ -181,7 +182,7 @@ contract ZestyMarket_ERC20_V2_1 is ZestyVault, ReentrancyGuard {
     }
 
     function getContract(uint256 _contractId)
-        public
+        external
         view
         returns (
             uint256 sellerAuctionId,
