@@ -8,12 +8,12 @@ async function main() {
   timeNow = timeNow.toNumber();
 
   const ZestyToken = await hre.ethers.getContractFactory("ZestyToken");
-  const zestyToken = await ZestyToken.deploy();
+  const zestyToken = await ZestyToken.deploy(signers[0].address);
   await zestyToken.deployed();
   console.log("ZestyToken deployed to:", zestyToken.address);
 
   const ZestyNFT = await hre.ethers.getContractFactory("ZestyNFT");
-  const zestyNFT = await ZestyNFT.deploy(ethers.constants.AddressZero);
+  const zestyNFT = await ZestyNFT.deploy(signers[0].address, ethers.constants.AddressZero);
   await zestyNFT.deployed();
   console.log("ZestyNFT deployed to:", zestyNFT.address);
 
