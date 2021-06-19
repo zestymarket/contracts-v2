@@ -188,6 +188,7 @@ describe('ZestyMarket_ERC20_V1_1', function() {
       expect(data.contractTimeStart).to.equal(timeNow + 101);
       expect(data.contractTimeEnd).to.equal(timeNow + 10001);
       expect(data.priceStart).to.equal(100);
+      expect(data.pricePending).to.equal(0);
       expect(data.priceEnd).to.equal(0);
       expect(data.buyerCampaign).to.equal(0);
       expect(data.buyerCampaignApproved).to.equal(1);
@@ -210,6 +211,7 @@ describe('ZestyMarket_ERC20_V1_1', function() {
       expect(data.contractTimeStart).to.equal(0);
       expect(data.contractTimeEnd).to.equal(0);
       expect(data.priceStart).to.equal(0);
+      expect(data.pricePending).to.equal(0);
       expect(data.priceEnd).to.equal(0);
       expect(data.buyerCampaign).to.equal(0);
       expect(data.buyerCampaignApproved).to.equal(0);
@@ -223,6 +225,8 @@ describe('ZestyMarket_ERC20_V1_1', function() {
     expect(data.seller).to.equal(ethers.constants.AddressZero);
     expect(data.autoApprove).to.equal(0);
     expect(data.inProgressCount).to.equal(0);
+
+    expect(await zestyNFT.ownerOf(0)).to.equal(signers[0].address);
   });
 
   it('[batched] It should allow a seller to approve the ad if autoApprove is disabled and withdraw when complete', async function() {
@@ -267,6 +271,7 @@ describe('ZestyMarket_ERC20_V1_1', function() {
       expect(data.contractTimeStart).to.equal(timeNow + 101);
       expect(data.contractTimeEnd).to.equal(timeNow + 10001);
       expect(data.priceStart).to.equal(100);
+      expect(data.pricePending).to.equal(0);
       expect(data.priceEnd).to.equal(98);
       expect(data.buyerCampaign).to.equal(1);
       expect(data.buyerCampaignApproved).to.equal(2);
@@ -527,6 +532,7 @@ describe('ZestyMarket_ERC20_V1_1', function() {
       expect(data.contractTimeStart).to.equal(timeNow + 101);
       expect(data.contractTimeEnd).to.equal(timeNow + 10001);
       expect(data.priceStart).to.equal(100);
+      expect(data.pricePending).to.equal(0);
       expect(data.priceEnd).to.equal(0);
       expect(data.buyerCampaign).to.equal(0);
       expect(data.buyerCampaignApproved).to.equal(1);
@@ -552,6 +558,7 @@ describe('ZestyMarket_ERC20_V1_1', function() {
       expect(data.contractTimeStart).to.equal(0);
       expect(data.contractTimeEnd).to.equal(0);
       expect(data.priceStart).to.equal(0);
+      expect(data.pricePending).to.equal(0);
       expect(data.priceEnd).to.equal(0);
       expect(data.buyerCampaign).to.equal(0);
       expect(data.buyerCampaignApproved).to.equal(0);
@@ -612,6 +619,7 @@ describe('ZestyMarket_ERC20_V1_1', function() {
       expect(data.contractTimeStart).to.equal(timeNow + 101);
       expect(data.contractTimeEnd).to.equal(timeNow + 10001);
       expect(data.priceStart).to.equal(100);
+      expect(data.pricePending).to.equal(0);
       expect(data.priceEnd).to.equal(98);
       expect(data.buyerCampaign).to.equal(1);
       expect(data.buyerCampaignApproved).to.equal(2);
