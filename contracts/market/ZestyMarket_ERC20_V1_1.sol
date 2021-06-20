@@ -34,10 +34,13 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
         uint256 inProgressCount;
     }
     mapping (uint256 => SellerNFTSetting) private _sellerNFTSettings; 
+    mapping (address => mapping(address => uint8)) private _sellerBans;
 
     event SellerNFTDeposit(uint256 indexed tokenId, address seller, uint8 autoApprove);
     event SellerNFTUpdate(uint256 indexed tokenId, uint8 autoApprove, uint256 inProgressCount);
     event SellerNFTWithdraw(uint256 indexed tokenId);
+    event SellerBan(address indexed seller, address indexed banAddress);
+    event SellerUnban(address indexed seller, address indexed banAddress);
 
     struct SellerAuction {
         address seller;
@@ -279,6 +282,16 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
         );
     }
 
+    function sellerBan(address _addr) external {
+        _sellerBans[msg.sender][_addr] = _TRUE;
+        emit SellerBan(msg.sender, _addr);
+    }
+
+    function sellerUnban(address _addr) external {
+        _sellerBans[msg.sender][_addr] = _FALSE;
+        emit SellerUnban(msg.sender, _addr);
+    }
+
     function sellerAuctionCreateBatch(
         uint256 _tokenId,
         uint256[] memory _auctionTimeStart,
@@ -425,6 +438,10 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
             require(
                 b.buyer == msg.sender || isOperator(b.buyer, msg.sender), 
                 "ZestyMarket_ERC20_V1::sellerAuctionBidBatch: Not buyer or operator for buyer"
+            );
+            require(
+                _sellerBans[s.seller][b.buyer] != _TRUE,
+                "ZestyMarket_ERC20_V1::sellerAuctionBidBatch: Banned by seller"
             );
 
             s.buyerCampaign = _buyerCampaignId;

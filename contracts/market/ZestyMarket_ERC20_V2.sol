@@ -30,7 +30,6 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
     uint32 private _zestyCut = 300; // 3% cut for zesty dao
     uint256 private _rewardsBalance;
     uint256 private _rewardsRate;  // rewardsToken per txToken
-    mapping (address => mapping(address => uint8)) private _sellerBans;
 
     constructor(
         address zestyNFTAddress_,
@@ -60,6 +59,7 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
         uint256 inProgressCount;
     }
     mapping (uint256 => SellerNFTSetting) private _sellerNFTSettings; 
+    mapping (address => mapping(address => uint8)) private _sellerBans;
 
     event SellerNFTDeposit(uint256 indexed tokenId, address seller, uint8 autoApprove);
     event SellerNFTUpdate(uint256 indexed tokenId, uint8 autoApprove, uint256 inProgressCount);
@@ -517,7 +517,7 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
                 "ZestyMarket_ERC20_V2::sellerAuctionBidBatch: Not buyer or operator for buyer"
             );
             require(
-                _sellerBans[s.seller][b.buyer] != _FALSE,
+                _sellerBans[s.seller][b.buyer] != _TRUE,
                 "ZestyMarket_ERC20_V2::sellerAuctionBidBatch: Banned by seller"
             );
 
@@ -824,7 +824,7 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
             uint256 reward = _rewardsRate.mul(c.contractValue);
 
             // give out rewards if there are enough rewards
-            if (_rewardsBalance >= reward.mul(3)) {
+            if (_rewardsBalance >= reward.mul(6)) {
                 require(
                     _rewardsToken.transfer(s.seller, reward),
                     "ZestyMarket_ERC20_V2::sellerAuctionRejectBatch: Transfer of ERC20 failed"
@@ -833,7 +833,10 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
                     _rewardsToken.transfer(b.buyer, reward),
                     "ZestyMarket_ERC20_V2::sellerAuctionRejectBatch: Transfer of ERC20 failed"
                 );
-
+                require(
+                    _rewardsToken.transfer(_validator, reward.mul(3)),
+                    "ZestyMarket_ERC20_V2::sellerAuctionRejectBatch: Transfer of ERC20 failed"
+                );
                 _zestyNFT.lockZestyToken(s.tokenId, reward);
                 _rewardsBalance = _rewardsBalance.sub(reward.mul(3));
             }
