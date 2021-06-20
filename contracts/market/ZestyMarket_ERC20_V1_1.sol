@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.7.6;
-pragma experimental ABIEncoderV2;
 
 import "../utils/SafeMath.sol";
 import "../utils/ReentrancyGuard.sol";
@@ -9,7 +8,6 @@ import "./ZestyVault.sol";
 
 contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
     using SafeMath for uint256;
-    using SafeMath for uint32;
 
     address private _erc20Address;
     uint256 private _buyerCampaignCount = 1; // 0 is used null values
