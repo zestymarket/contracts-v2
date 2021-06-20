@@ -142,5 +142,18 @@ contract TokenVesting is Ownable, ReentrancyGuard {
         emit VaultClaim(msg.sender, amountClaimed);
     }
 
+    // Added to support recovering LP Rewards from other systems such as BAL to be distributed to holders
+    function recoverERC20(address tokenAddress, uint256 tokenAmount) external onlyOwner nonReentrant {
+        require(
+            tokenAddress != _zestyTokenAddress, 
+            "StakingRewards::recoverERC20: Cannot withdraw zesty token"
+        );
+        require(
+            IERC20(tokenAddress).transfer(owner(), tokenAmount), 
+            "StakingRewards::recoverERC20: Transfer of ERC20 failed"
+        );
+        emit Recovered(tokenAddress, tokenAmount);
+    }
+
 
 }
