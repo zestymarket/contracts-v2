@@ -9,7 +9,7 @@ contract GovernorAlpha {
     string public constant name = "Zesty Governor Alpha";
 
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
-    function quorumVotes() public pure returns (uint) { return 4_000_000e18; } // 4 million ZESTY = 4% of Total Supply
+    function quorumVotes() public pure returns (uint) { return 7_000_000e18; } // 7 million ZESTY = 7% of Total Supply
 
     /// @notice The number of votes required in order for a voter to become a proposer
     function proposalThreshold() public pure returns (uint) { return 1_000_000e18; } // 1 million ZESTY = 1% of Total Supply
