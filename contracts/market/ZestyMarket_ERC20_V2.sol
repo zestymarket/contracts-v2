@@ -5,6 +5,7 @@ pragma experimental ABIEncoderV2;
 import "../utils/SafeMath.sol";
 import "../utils/ReentrancyGuard.sol";
 import "../interfaces/IERC20.sol";
+import "../interfaces/IZestyNFT.sol";
 import "../governance/RewardsRecipient.sol";
 import "./ZestyVault.sol";
 
@@ -12,7 +13,11 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeMath for uint32;
 
-    address private _erc20Address;
+    address private _txTokenAddress;
+    address private _rewardsTokenAddress;
+    IERC20 private _txToken;
+    IERC20 private _rewardsToken;
+    IZestyNFT private _zestyNFT;
     address private _validator;
     uint256 private _buyerCampaignCount = 1; // 0 is used null values
     uint256 private _sellerAuctionCount = 1; // 0 is used for null values
@@ -23,20 +28,29 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
     uint32 private _minAvailabilityThreshold = 7500; // min 75% availablility guaranteed
     uint32 private _validatorCut = 300; // 3% cut for validators
     uint32 private _zestyCut = 300; // 3% cut for zesty dao
+    uint256 private _rewardsBalance;
+    uint256 private _rewardsRate;  // rewardsToken per txToken
     mapping (address => mapping(address => uint8)) private _sellerBans;
 
     constructor(
-        address erc20Address_,
         address zestyNFTAddress_,
+        address txTokenAddress_,
+        address rewardsTokenAddress_,
         address zestyDAO_,
         address validator_,
-        address rewardsDistributor_
+        address rewardsDistributor_,
+        uint256 rewardsRate_
     ) 
         ZestyVault(zestyNFTAddress_) 
         RewardsRecipient(zestyDAO_, rewardsDistributor_)
     {
-        _erc20Address = erc20Address_;
+        _zestyNFT = IZestyNFT(zestyNFTAddress_);
+        _txTokenAddress = txTokenAddress_;
+        _txToken = IERC20(txTokenAddress_);
+        _rewardsTokenAddress = rewardsTokenAddress_;
+        _rewardsToken = IERC20(rewardsTokenAddress_);
         _validator = validator_;
+        _rewardsRate = rewardsRate_;
     }
     
     struct SellerNFTSetting {
@@ -133,15 +147,29 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
         uint256 indexed contractId,
         string share
     );
-    event ContractWithdraw(uint256 indexed contractId);
+    event ContractWithdraw(uint256 indexed contractId, uint256 nftReward, uint256 sellerReward, uint256 buyerReward);
     event ContractRefund(uint256 indexed contractId);
 
-    function getERC20Address() external view returns (address) {
-        return _erc20Address;
+    event RewardAdded(uint256 reward);
+
+    function getTxTokenAddress() external view returns (address) {
+        return _txTokenAddress;
+    }
+
+    function getRewardsTokenAddress() external view returns (address) {
+        return _rewardsTokenAddress;
     }
 
     function getValidator() external view returns (address) {
         return _validator;
+    }
+
+    function getRewardsBalance() external view returns (uint256) {
+        return _rewardsBalance;
+    }
+
+    function getRewardsRate() external view returns (uint256) {
+        return _rewardsRate;
     }
 
     function getSellerNFTSetting(uint256 _tokenId) 
@@ -246,6 +274,10 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
 
     function setMinAvailiblityThreshold(uint32 minAvailabilityThreshold_) external onlyOwner {
         _minAvailabilityThreshold = minAvailabilityThreshold_;
+    }
+
+    function setRewardsRate(uint256 rewardsRate_) external onlyOwner {
+        _rewardsRate = rewardsRate_;
     }
 
     /* 
@@ -499,7 +531,7 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
             s.pricePending = price;
 
             require(
-                IERC20(_erc20Address).transferFrom(b.buyer, address(this), price),
+                _txToken.transferFrom(b.buyer, address(this), price),
                 "ZestyMarket_ERC20_V2::sellerAuctionBidBatch Transfer of ERC20 failed, check if sufficient allowance is provided"
             );
 
@@ -554,7 +586,7 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
             _sellerAuctions[_sellerAuctionId[i]].buyerCampaign = 0;
 
             require(
-                IERC20(_erc20Address).transfer(b.buyer, pricePending),
+                _txToken.transfer(b.buyer, pricePending),
                 "ZestyMarket_ERC20_V2::sellerAuctionBidCancelBatch: Transfer of ERC20 failed"
             );
 
@@ -593,7 +625,7 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
             s.pricePending = 0;
 
             require(
-                IERC20(_erc20Address).transfer(_buyerCampaigns[s.buyerCampaign].buyer, priceDiff),
+                _txToken.transfer(_buyerCampaigns[s.buyerCampaign].buyer, priceDiff),
                 "ZestyMarket_ERC20_V2::sellerAuctionApproveBatch: Transfer of ERC20 failed"
             );
 
@@ -649,15 +681,15 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
             s.pricePending = 0;
 
             require(
-                IERC20(_erc20Address).transfer(_buyerCampaigns[s.buyerCampaign].buyer, returnToBuyer),
+                _txToken.transfer(_buyerCampaigns[s.buyerCampaign].buyer, returnToBuyer),
                 "ZestyMarket_ERC20_V2::sellerAuctionRejectBatch: Transfer of ERC20 failed"
             );
             require(
-                IERC20(_erc20Address).transfer(owner(), zestyShare),
+                _txToken.transfer(owner(), zestyShare),
                 "ZestyMarket_ERC20_V2::sellerAuctionRejectBatch: Transfer of ERC20 failed"
             );
             require(
-                IERC20(_erc20Address).transfer(_validator, validatorShare),
+                _txToken.transfer(_validator, validatorShare),
                 "ZestyMarket_ERC20_V2::sellerAuctionRejectBatch: Transfer of ERC20 failed"
             );
 
@@ -737,6 +769,7 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
         for(uint i=0; i < _contractId.length; i++) {
             Contract storage c = _contracts[_contractId[i]];
             SellerAuction storage s = _sellerAuctions[c.sellerAuctionId];
+            BuyerCampaign storage b = _buyerCampaigns[c.buyerCampaignId];
 
             require(
                 s.seller == msg.sender || isOperator(s.seller, msg.sender), 
@@ -773,20 +806,38 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
             uint256 returnToSeller = c.contractValue.sub(validatorShare).sub(zestyShare);
 
             require(
-                IERC20(_erc20Address).transfer(s.seller, returnToSeller),
+                _txToken.transfer(s.seller, returnToSeller),
                 "ZestyMarket_ERC20_V2::sellerAuctionRejectBatch: Transfer of ERC20 failed"
             );
             require(
-                IERC20(_erc20Address).transfer(owner(), zestyShare),
+                _txToken.transfer(owner(), zestyShare),
                 "ZestyMarket_ERC20_V2::sellerAuctionRejectBatch: Transfer of ERC20 failed"
             );
             require(
-                IERC20(_erc20Address).transfer(_validator, validatorShare),
+                _txToken.transfer(_validator, validatorShare),
                 "ZestyMarket_ERC20_V2::sellerAuctionRejectBatch: Transfer of ERC20 failed"
             );
 
             SellerNFTSetting storage se = _sellerNFTSettings[s.tokenId];
             se.inProgressCount = se.inProgressCount.sub(1);
+
+            uint256 reward = _rewardsRate.mul(c.contractValue);
+
+            // give out rewards if there are enough rewards
+            if (_rewardsBalance >= reward.mul(3)) {
+                require(
+                    _rewardsToken.transfer(s.seller, reward),
+                    "ZestyMarket_ERC20_V2::sellerAuctionRejectBatch: Transfer of ERC20 failed"
+                );
+                require(
+                    _rewardsToken.transfer(b.buyer, reward),
+                    "ZestyMarket_ERC20_V2::sellerAuctionRejectBatch: Transfer of ERC20 failed"
+                );
+
+                _zestyNFT.lockZestyToken(s.tokenId, reward);
+                _rewardsBalance = _rewardsBalance.sub(reward.mul(3));
+            }
+
 
             emit SellerNFTUpdate(
                 se.tokenId,
@@ -794,7 +845,7 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
                 se.inProgressCount
             );
 
-            emit ContractWithdraw(_contractId[i]);
+            emit ContractWithdraw(_contractId[i], reward, reward, reward);
         }
     }
 
@@ -824,7 +875,7 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
             c.refunded = _TRUE;
 
             require(
-                IERC20(_erc20Address).transfer(b.buyer, c.contractValue),
+                _txToken.transfer(b.buyer, c.contractValue),
                 "ZestyMarket_ERC20_V2::contractWithdrawBatch: Transfer of ERC20 failed"
             );
 
@@ -839,5 +890,10 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
 
             emit ContractRefund(_contractId[i]);
         }
+    }
+
+    function notifyRewardAmount(uint256 reward) external override onlyRewardsDistributor {
+        _rewardsBalance = _rewardsBalance.add(reward);
+        emit RewardAdded(reward);
     }
 }

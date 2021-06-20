@@ -9,7 +9,8 @@ import "./ZestyVault.sol";
 contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
     using SafeMath for uint256;
 
-    address private _erc20Address;
+    address private _txTokenAddress;
+    IERC20 private _txToken;
     uint256 private _buyerCampaignCount = 1; // 0 is used null values
     uint256 private _sellerAuctionCount = 1; // 0 is used for null values
     uint256 private _contractCount = 1;
@@ -17,12 +18,13 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
     uint8 private constant _TRUE = 2;
 
     constructor(
-        address erc20Address_,
+        address txTokenAddress_,
         address zestyNFTAddress_
     ) 
         ZestyVault(zestyNFTAddress_) 
     {
-        _erc20Address = erc20Address_;
+        _txTokenAddress = txTokenAddress_;
+        _txToken = IERC20(txTokenAddress_);
     }
     
     struct SellerNFTSetting {
@@ -106,8 +108,8 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
     );
     event ContractWithdraw(uint256 indexed contractId);
 
-    function getERC20Address() external view returns (address) {
-        return _erc20Address;
+    function getTxTokenAddress() external view returns (address) {
+        return _txTokenAddress;
     }
 
     function getSellerNFTSetting(uint256 _tokenId) 
@@ -435,7 +437,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
             s.pricePending = price;
 
             require(
-                IERC20(_erc20Address).transferFrom(b.buyer, address(this), price),
+                _txToken.transferFrom(b.buyer, address(this), price),
                 "ZestyMarket_ERC20_V1::sellerAuctionBidBatch Transfer of ERC20 failed, check if sufficient allowance is provided"
             );
 
@@ -490,7 +492,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
             _sellerAuctions[_sellerAuctionId[i]].buyerCampaign = 0;
 
             require(
-                IERC20(_erc20Address).transfer(b.buyer, pricePending),
+                _txToken.transfer(b.buyer, pricePending),
                 "ZestyMarket_ERC20_V1::sellerAuctionBidCancelBatch: Transfer of ERC20 failed"
             );
 
@@ -529,7 +531,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
             s.pricePending = 0;
 
             require(
-                IERC20(_erc20Address).transfer(_buyerCampaigns[s.buyerCampaign].buyer, priceDiff),
+                _txToken.transfer(_buyerCampaigns[s.buyerCampaign].buyer, priceDiff),
                 "ZestyMarket_ERC20_V1::sellerAuctionApproveBatch: Transfer of ERC20 failed"
             );
 
@@ -580,7 +582,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
             s.pricePending = 0;
 
             require(
-                IERC20(_erc20Address).transfer(_buyerCampaigns[s.buyerCampaign].buyer, pricePending),
+                _txToken.transfer(_buyerCampaigns[s.buyerCampaign].buyer, pricePending),
                 "ZestyMarket_ERC20_V1::sellerAuctionRejectBatch: Transfer of ERC20 failed"
             );
 
@@ -615,7 +617,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
             c.withdrawn = _TRUE;
 
             require(
-                IERC20(_erc20Address).transfer(s.seller, c.contractValue),
+                _txToken.transfer(s.seller, c.contractValue),
                 "ZestyMarket_ERC20_V1::contractWithdrawBatch: Transfer of ERC20 failed"
 
             );
