@@ -107,6 +107,8 @@ contract RewardsDistributor is Ownable, IRewardsDistributor {
             if (_recipients[i].recipient != address(0) || _recipients[i].amount != 0) {
                 remainder = remainder.sub(_recipients[i].amount);
 
+                require(remainder >= _recipients[i].amount, "Not enough amount provided");
+
                 _rewardToken.transfer(_recipients[i].recipient, _recipients[i].amount);
 
                 bytes memory payload = abi.encodeWithSignature("notifyRewardAmount(uint256)", _recipients[i].amount);
