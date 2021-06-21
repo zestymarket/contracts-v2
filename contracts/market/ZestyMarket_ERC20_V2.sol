@@ -73,8 +73,6 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
     event SellerNFTDeposit(uint256 indexed tokenId, address seller, uint8 autoApprove);
     event SellerNFTUpdate(uint256 indexed tokenId, uint8 autoApprove, uint256 inProgressCount);
     event SellerNFTWithdraw(uint256 indexed tokenId);
-    event SellerBan(address indexed seller, address indexed banAddress);
-    event SellerUnban(address indexed seller, address indexed banAddress);
 
     struct SellerAuction {
         address seller;
@@ -276,7 +274,10 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
             uint256 contractTimeStart,
             uint256 contractTimeEnd,
             uint256 contractValue,
-            uint8 withdrawn
+            uint8 withdrawn,
+            uint8 refunded,
+            string[] memory shares,
+            uint32 totalShares
         )
     {
         sellerAuctionId = _contracts[_contractId].sellerAuctionId;
@@ -285,6 +286,9 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
         contractTimeEnd = _contracts[_contractId].contractTimeEnd;
         contractValue = _contracts[_contractId].contractValue;
         withdrawn = _contracts[_contractId].withdrawn;
+        refunded = _contracts[_contractId].refunded;
+        shares = _contracts[_contractId].shares;
+        totalShares = _contracts[_contractId].totalShares;
     }
 
     /*
@@ -395,16 +399,6 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
             _autoApprove,
             s.inProgressCount
         );
-    }
-
-    function sellerBan(address _addr) external {
-        _sellerBans[msg.sender][_addr] = _TRUE;
-        emit SellerBan(msg.sender, _addr);
-    }
-
-    function sellerUnban(address _addr) external {
-        _sellerBans[msg.sender][_addr] = _FALSE;
-        emit SellerUnban(msg.sender, _addr);
     }
 
     function sellerAuctionCreateBatch(
@@ -553,10 +547,6 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
             require(
                 b.buyer == msg.sender || isOperator(b.buyer, msg.sender), 
                 "ZestyMarket_ERC20_V2::sellerAuctionBidBatch: Not buyer or operator for buyer"
-            );
-            require(
-                _sellerBans[s.seller][b.buyer] != _TRUE,
-                "ZestyMarket_ERC20_V2::sellerAuctionBidBatch: Banned by seller"
             );
 
             s.buyerCampaign = _buyerCampaignId;
@@ -765,7 +755,7 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
             );
 
             c.hashlock = _hashlock[i];
-            delete c.shares;  // clear old shares if any
+            delete c.shares;
             c.totalShares = _totalShares[i];
 
             emit ContractSetHashlock(
@@ -778,20 +768,17 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
 
     function contractSetShare(uint256 _contractId, string memory _share) external {
         require(msg.sender == _validator, "ZestyMarket_ERC20_V2::contractSetShare: Not validator");
-        Contract storage c = _contracts[_contractId];
 
         require(
-            c.sellerAuctionId != 0 || c.buyerCampaignId != 0,
+            _contracts[_contractId].sellerAuctionId != 0 || _contracts[_contractId].buyerCampaignId != 0,
             "ZestyMarket_ERC20_V2::contractWithdrawBatch: Invalid contract"
         );
         require(
-            c.hashlock != 0x0, 
+            _contracts[_contractId].hashlock != 0x0, 
             "ZestyMarket_ERC20_V2::contractSetShare: Hashlock has not been set"
         );
 
-        // does not check for validity of share
-        // the checking will be done offchain through publicly verifiable secret sharing
-        c.shares.push(_share);
+        _contracts[_contractId].shares.push(_share);
 
         emit ContractSetShare(
             _contractId, 
@@ -826,10 +813,8 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
                 "ZestyMarket_ERC20_V2::contractWithdrawBatch: Already withdrawn or refunded"
             );
             require(
-                c.shares.length != 0
-                && c.totalShares != 0
-                && c.shares.length >= c.totalShares.mul(_minAvailabilityThreshold).div(10000), 
-                "ZestyMarket_ERC20_V2::contractWithdrawBatch: Availability threshold not reached"
+                c.shares.length != 0 && c.totalShares != 0,
+                "ZestyMarket_ERC20_V2::contractWithdrawBatch: Shares have not been set"
             );
             require(
                 c.hashlock == keccak256(abi.encodePacked(_preimage[i])), 
