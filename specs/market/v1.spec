@@ -9,6 +9,8 @@
 methods {
     getAuctionPricePending(uint256) returns uint256 envfree
     getAuctionBuyerCampaign(uint256) returns uint256 envfree
+	getAuctionPriceStart(uint256) returns uint256 envfree
+	getAuctionPriceEnd(uint256) returns uint256 envfree
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -52,7 +54,7 @@ ghost sumDeposits(uint256) returns uint {
 */
 
 
-invariant auctionHasPricePendingIffHasBuyerCampaign(uint256 auctionId)
+invariant auctionHasPricePendingIfHasBuyerCampaign(uint256 auctionId)
     getAuctionPricePending(auctionId) != 0 <=> getAuctionBuyerCampaign(auctionId) != 0
 
 
@@ -69,8 +71,61 @@ function validState(...) {
 //                       Rules                                            //
 ////////////////////////////////////////////////////////////////////////////
     
+rule auctionAutoApprovalCanBeTrueOrFalse(uint256 _tokenId) {
 
+	env e;
 
+	uint8 _autoApproveTrue = 2;
+	uint8 _autoApproveFalse = 1;
+	uint8 _autoApproveOther = 0;
+
+	require _tokenId > 0;
+	require e.msg.value == 0;
+
+	sellerNFTDeposit(e, _tokenId, _autoApproveTrue);
+	assert true;
+
+	sellerNFTDeposit(e, _tokenId, _autoApproveFalse);
+	assert true;
+
+	sellerNFTDeposit(e, _tokenId, _autoApproveOther);
+	assert false;
+}
+
+rule auctionAutoApprovalCanBeTrueOrFalseA(uint256 _tokenId) {
+
+	env e;
+
+	uint8 _autoApproveTrue = 2;
+	uint8 _autoApproveFalse = 1;
+	uint8 _autoApproveOther = 0;
+
+	require _tokenId > 0;
+	require e.msg.value == 0;
+
+	sellerNFTDeposit@withrevert(e, _tokenId, _autoApproveTrue);
+	assert !lastReverted;
+
+	sellerNFTDeposit@withrevert(e, _tokenId, _autoApproveFalse);
+	assert !lastReverted;
+
+	sellerNFTDeposit@withrevert(e, _tokenId, _autoApproveOther);
+	assert lastReverted;
+}
+
+rule priceShouldAlwaysBeBetweenPriceStartAndPriceEnd {
+	env e;
+	uint256 _sellerAuctionId;
+	uint256 _auctionPriceStart;
+	uint256 _auctionPriceEnd;
+	uint256 _auctionPrice;
+
+	_auctionPriceStart = getAuctionPriceStart(_sellerAuctionId);
+	_auctionPriceEnd = getAuctionPriceEnd(_sellerAuctionId);
+	_auctionPrice = getSellerAuctionPrice(e, _sellerAuctionId);
+
+	assert (_auctionPriceStart >= _auctionPrice) && (_auctionPrice >= _auctionPriceEnd);
+}
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Helper Functions                                 //
