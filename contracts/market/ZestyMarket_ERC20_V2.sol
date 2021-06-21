@@ -25,7 +25,6 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
     uint8 private constant _FALSE = 1;
     uint8 private constant _TRUE = 2;
     uint256 private _gracePeriod = 172800; // 2 day grace period for seller to withdraw funds
-    uint32 private _minAvailabilityThreshold = 7500; // min 75% availablility guaranteed
     uint32 private _validatorCut = 300; // 3% cut for validators
     uint32 private _zestyCut = 300; // 3% cut for zesty dao
     uint256 private _rewardsBalance;
@@ -301,10 +300,6 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
     function setCuts(uint32 validatorCut_, uint32 zestyCut_) external onlyOwner {
         _validatorCut = validatorCut_;
         _zestyCut = zestyCut_;
-    }
-
-    function setMinAvailiblityThreshold(uint32 minAvailabilityThreshold_) external onlyOwner {
-        _minAvailabilityThreshold = minAvailabilityThreshold_;
     }
 
     function setRewardsRate(
