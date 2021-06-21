@@ -29,7 +29,10 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
     uint32 private _validatorCut = 300; // 3% cut for validators
     uint32 private _zestyCut = 300; // 3% cut for zesty dao
     uint256 private _rewardsBalance;
-    uint256 private _rewardsRate;  // rewardsToken per txToken
+    uint256 private _rewardsRateBuyer;  // rewardsToken per txToken
+    uint256 private _rewardsRateSeller;  // rewardsToken per txToken
+    uint256 private _rewardsRateValidator;  // rewardsToken per txToken
+    uint256 private _rewardsRateNFT;  // rewardsToken per txToken
 
     constructor(
         address zestyNFTAddress_,
@@ -38,7 +41,10 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
         address zestyDAO_,
         address validator_,
         address rewardsDistributor_,
-        uint256 rewardsRate_
+        uint256 rewardsRateBuyer_,
+        uint256 rewardsRateSeller_,
+        uint256 rewardsRateValidator_,
+        uint256 rewardsRateNFT_
     ) 
         ZestyVault(zestyNFTAddress_) 
         RewardsRecipient(zestyDAO_, rewardsDistributor_)
@@ -49,7 +55,10 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
         _rewardsTokenAddress = rewardsTokenAddress_;
         _rewardsToken = IERC20(rewardsTokenAddress_);
         _validator = validator_;
-        _rewardsRate = rewardsRate_;
+        _rewardsRateBuyer = rewardsRateBuyer_;
+        _rewardsRateSeller = rewardsRateSeller_;
+        _rewardsRateValidator = rewardsRateValidator_;
+        _rewardsRateNFT = rewardsRateNFT_;
     }
     
     struct SellerNFTSetting {
@@ -147,7 +156,13 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
         uint256 indexed contractId,
         string share
     );
-    event ContractWithdraw(uint256 indexed contractId, uint256 nftReward, uint256 sellerReward, uint256 buyerReward);
+    event ContractWithdraw(
+        uint256 indexed contractId, 
+        uint256 sellerReward, 
+        uint256 buyerReward,
+        uint256 validatorReward, 
+        uint256 nftReward 
+    );
     event ContractRefund(uint256 indexed contractId);
 
     event RewardAdded(uint256 reward);
@@ -168,8 +183,20 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
         return _rewardsBalance;
     }
 
-    function getRewardsRate() external view returns (uint256) {
-        return _rewardsRate;
+    function getRewardsRate() 
+        external 
+        view 
+        returns (
+            uint256 rewardsRateBuyer,
+            uint256 rewardsRateSeller,
+            uint256 rewardsRateNFT,
+            uint256 rewardsRateValidator
+        ) 
+    {
+        rewardsRateBuyer = _rewardsRateBuyer;
+        rewardsRateSeller = _rewardsRateSeller;
+        rewardsRateNFT = _rewardsRateNFT;
+        rewardsRateValidator = _rewardsRateValidator;
     }
 
     function getSellerNFTSetting(uint256 _tokenId) 
@@ -276,8 +303,19 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
         _minAvailabilityThreshold = minAvailabilityThreshold_;
     }
 
-    function setRewardsRate(uint256 rewardsRate_) external onlyOwner {
-        _rewardsRate = rewardsRate_;
+    function setRewardsRate(
+        uint256 rewardsRateBuyer_,
+        uint256 rewardsRateSeller_,
+        uint256 rewardsRateNFT_,
+        uint256 rewardsRateValidator_
+    ) 
+        external 
+        onlyOwner 
+    {
+        _rewardsRateBuyer = rewardsRateBuyer_;
+        _rewardsRateSeller = rewardsRateSeller_;
+        _rewardsRateNFT = rewardsRateNFT_;
+        _rewardsRateValidator = rewardsRateValidator_;
     }
 
     /* 
@@ -821,26 +859,28 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
             SellerNFTSetting storage se = _sellerNFTSettings[s.tokenId];
             se.inProgressCount = se.inProgressCount.sub(1);
 
-            uint256 reward = _rewardsRate.mul(c.contractValue);
+            uint256 rewardBuyer = _rewardsRateBuyer.mul(c.contractValue);
+            uint256 rewardSeller = _rewardsRateSeller.mul(c.contractValue);
+            uint256 rewardValidator = _rewardsRateValidator.mul(c.contractValue);
+            uint256 rewardNFT = _rewardsRateNFT.mul(c.contractValue);
 
             // give out rewards if there are enough rewards
-            if (_rewardsBalance >= reward.mul(6)) {
+            if (_rewardsBalance >= rewardBuyer.add(rewardSeller.add(rewardNFT.add(rewardValidator)))) {
                 require(
-                    _rewardsToken.transfer(s.seller, reward),
+                    _rewardsToken.transfer(s.seller, rewardSeller),
                     "ZestyMarket_ERC20_V2::sellerAuctionRejectBatch: Transfer of ERC20 failed"
                 );
                 require(
-                    _rewardsToken.transfer(b.buyer, reward),
+                    _rewardsToken.transfer(b.buyer, rewardBuyer),
                     "ZestyMarket_ERC20_V2::sellerAuctionRejectBatch: Transfer of ERC20 failed"
                 );
                 require(
-                    _rewardsToken.transfer(_validator, reward.mul(3)),
+                    _rewardsToken.transfer(_validator, rewardValidator),
                     "ZestyMarket_ERC20_V2::sellerAuctionRejectBatch: Transfer of ERC20 failed"
                 );
-                _zestyNFT.lockZestyToken(s.tokenId, reward);
-                _rewardsBalance = _rewardsBalance.sub(reward.mul(3));
+                _zestyNFT.lockZestyToken(s.tokenId, rewardNFT);
+                _rewardsBalance = _rewardsBalance.sub(rewardBuyer.add(rewardSeller.add(rewardNFT.add(rewardValidator))));
             }
-
 
             emit SellerNFTUpdate(
                 se.tokenId,
@@ -848,7 +888,13 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
                 se.inProgressCount
             );
 
-            emit ContractWithdraw(_contractId[i], reward, reward, reward);
+            emit ContractWithdraw(
+                _contractId[i], 
+                rewardBuyer,
+                rewardSeller, 
+                rewardValidator, 
+                rewardNFT 
+            );
         }
     }
 
