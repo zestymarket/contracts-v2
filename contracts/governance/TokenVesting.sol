@@ -31,6 +31,7 @@ contract TokenVesting is Ownable, ReentrancyGuard {
     event VaultClaim(address recipient, uint256 amountClaimed);
     event VaultCancel(address recipient, uint256 amountClaimed, uint256 amountReturned);
 
+    event Recovered(address token, uint256 amount);
 
     function getZestyTokenAddress() public view returns (address) {
         return _zestyTokenAddress; 
@@ -154,6 +155,4 @@ contract TokenVesting is Ownable, ReentrancyGuard {
         );
         emit Recovered(tokenAddress, tokenAmount);
     }
-
-
 }
