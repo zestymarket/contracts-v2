@@ -1,22 +1,28 @@
-    /*
+/*
     This is a specification file for smart contract verification with the Certora prover.
     For more information, visit: https://www.certora.com/
 
-    This file is run with scripts/...
+    This file is run with scripts/v1.sh
 	Assumptions: 
 */
+
+using DummyERC20A as token
 
 methods {
     getAuctionPricePending(uint256) returns uint256 envfree
     getAuctionBuyerCampaign(uint256) returns uint256 envfree
 	getAuctionPriceStart(uint256) returns uint256 envfree
 	getAuctionPriceEnd(uint256) returns uint256 envfree
+
+	token.balanceOf(address) returns uint256 envfree
 }
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Ghost                                            //
 ////////////////////////////////////////////////////////////////////////////
 
+ghost uint8oracle() returns uint8;
+ghost uint256oracle() returns uint256;
 
 // Ghosts are like additional function
 // sumDeposits(address user) returns (uint256);
@@ -54,7 +60,7 @@ ghost sumDeposits(uint256) returns uint {
 */
 
 
-invariant auctionHasPricePendingIfHasBuyerCampaign(uint256 auctionId)
+invariant auctionHasPricePendingIfAndOnlyIfHasBuyerCampaign(uint256 auctionId)
     getAuctionPricePending(auctionId) != 0 <=> getAuctionBuyerCampaign(auctionId) != 0
 
 
@@ -127,10 +133,46 @@ rule priceShouldAlwaysBeBetweenPriceStartAndPriceEnd {
 	assert (_auctionPriceStart >= _auctionPrice) && (_auctionPrice >= _auctionPriceEnd);
 }
 
+rule bidAdditivity(uint x, uint y, address who) {
+	additivity(x, y, who, sellerAuctionBidBatch(uint256[],uint256).selector);
+	assert true;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////
 //                       Helper Functions                                 //
 ////////////////////////////////////////////////////////////////////////////
     
+
+function additivity(uint x, uint y, address who, uint32 funcId) {
+	env e;
+	storage init = lastStorage;
+
+	callFunctionWithAmountAndSender(funcId, [x], who);
+	callFunctionWithAmountAndSender(funcId, [y], who);
+
+	uint splitWho = token.balanceOf(who);
+	uint splitMarket = token.balanceOf(currentContract);
+
+	callFunctionWithAmountAndSender(funcId, [x,y], who) at init;
+
+	uint unifiedWho = token.balanceOf(who);
+	uint unifiedMarket = token.balanceOf(currentContract);
+
+	assert splitWho == unifiedWho, "operation is not additive for the given address balance";
+	assert splitMarket == unifiedMarket, "operation is not additive for the market balance";
+}
+
+function callFunctionWithAmountAndSender(uint32 funcId, uint[] array, address who) {
+	if (funcId == sellerAuctionBidBatch(uint256[],uint256).selector) {
+		env e;
+		require e.msg.sender == who;
+		sellerAuctionBidBatch(e, array, uint256oracle());
+	} else {
+		require false;
+	}
+}
+
 /*
 // easy to use dispatcher
 function callFunctionWithParams(address token, address from, address to,
