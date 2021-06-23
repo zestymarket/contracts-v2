@@ -121,22 +121,29 @@ rule auctionAutoApprovalCanBeTrueOrFalseA(uint256 _tokenId) {
 
 rule priceShouldAlwaysBeBetweenPriceStartAndPriceEnd {
 	env e;
+	calldataarg args;
+
 	uint256 _sellerAuctionId;
 	uint256 _auctionPriceStart;
 	uint256 _auctionPriceEnd;
 	uint256 _auctionPrice;
 
-	_auctionPriceStart = getAuctionPriceStart(_sellerAuctionId);
-	_auctionPriceEnd = getAuctionPriceEnd(_sellerAuctionId);
-	_auctionPrice = getSellerAuctionPrice(e, _sellerAuctionId);
+	sellerNFTDeposit(e, args);
+	sellerAuctionCreateBatch(e, args);
+	buyerCampaignCreate(e, args);
+	sellerAuctionBidBatch(e, args);
+
+	_auctionPriceStart = getAuctionPriceStart(args);
+	_auctionPriceEnd = getAuctionPriceEnd(args);
+	_auctionPrice = getSellerAuctionPrice(e, args);
 
 	assert (_auctionPriceStart >= _auctionPrice) && (_auctionPrice >= _auctionPriceEnd);
 }
 
-rule bidAdditivity(uint x, uint y, address who) {
+/*rule bidAdditivity(uint x, uint y, address who) {
 	additivity(x, y, who, sellerAuctionBidBatch(uint256[],uint256).selector);
 	assert true;
-}
+}*/
 
 
 ////////////////////////////////////////////////////////////////////////////
@@ -144,7 +151,7 @@ rule bidAdditivity(uint x, uint y, address who) {
 ////////////////////////////////////////////////////////////////////////////
     
 
-function additivity(uint x, uint y, address who, uint32 funcId) {
+/*function additivity(uint x, uint y, address who, uint32 funcId) {
 	env e;
 	storage init = lastStorage;
 
@@ -171,7 +178,7 @@ function callFunctionWithAmountAndSender(uint32 funcId, uint[] array, address wh
 	} else {
 		require false;
 	}
-}
+}*/
 
 /*
 // easy to use dispatcher
