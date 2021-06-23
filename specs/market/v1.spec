@@ -14,7 +14,12 @@ methods {
 	getAuctionPriceStart(uint256) returns uint256 envfree
 	getAuctionPriceEnd(uint256) returns uint256 envfree
 
+	getBuyer(uint256) returns address envfree
+
 	token.balanceOf(address) returns uint256 envfree
+
+	// summarize
+	getSellerAuctionPrice(uint256 id) => auctionPrice(id)
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -23,6 +28,16 @@ methods {
 
 ghost uint8oracle() returns uint8;
 ghost uint256oracle() returns uint256;
+
+ghost buyerCampaignCount() returns uint256;
+
+ghost auctionPrice(uint256) returns uint256;
+
+ghost auctionPriceStart(uint256) returns uint256;
+
+hook Sload uint value _sellerAuctions[KEY uint256 id].(offset 64) STORAGE {
+	require auctionPriceStart(id) == value;
+}
 
 // Ghosts are like additional function
 // sumDeposits(address user) returns (uint256);
@@ -34,6 +49,13 @@ ghost sumDeposits(uint256) returns uint {
 }
 */
 
+hook Sstore _buyerCampaignCount uint value STORAGE {
+	havoc buyerCampaignCount assuming buyerCampaignCount@new() == value;
+}
+
+hook Sload uint value _buyerCampaignCount STORAGE {
+	require buyerCampaignCount() == value;
+}
 
 
 // whenever there ia an update to
@@ -68,11 +90,15 @@ invariant auctionHasPricePendingIfAndOnlyIfHasBuyerCampaign(uint256 auctionId)
 
 
 
-/*
-function validState(...) {
 
+function validStateAuction(uint auctionId) {
+	require auctionPriceStart(auctionId) >= auctionPrice(auctionId); // TODO: Check
 } 
-*/
+
+function validStateBuyer(uint campaignId) {
+	require campaignId == 0 => getBuyer(campaignId) == 0; // TODO and strengthen (to an iff)
+}
+
 ////////////////////////////////////////////////////////////////////////////
 //                       Rules                                            //
 ////////////////////////////////////////////////////////////////////////////
@@ -140,18 +166,33 @@ rule priceShouldAlwaysBeBetweenPriceStartAndPriceEnd {
 	assert (_auctionPriceStart >= _auctionPrice) && (_auctionPrice >= _auctionPriceEnd);
 }
 
-/*rule bidAdditivity(uint x, uint y, address who) {
+rule bidAdditivity(uint x, uint y, address who) {
+	validStateAuction(x);
+	validStateAuction(y);
 	additivity(x, y, who, sellerAuctionBidBatch(uint256[],uint256).selector);
 	assert true;
-}*/
+}
 
+// Status: ghost issue
+rule buyerCampaignCountMonotonicallyIncreasing(method f) {
+	uint pre = buyerCampaignCount();
+
+	env e;
+	calldataarg arg;
+	f(e, arg);
+
+	uint post = buyerCampaignCount();
+
+	assert post >= pre;
+	assert post > pre => f.selector == buyerCampaignCreate(string).selector;
+}
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Helper Functions                                 //
 ////////////////////////////////////////////////////////////////////////////
     
 
-/*function additivity(uint x, uint y, address who, uint32 funcId) {
+function additivity(uint x, uint y, address who, uint32 funcId) {
 	env e;
 	storage init = lastStorage;
 
@@ -174,11 +215,13 @@ function callFunctionWithAmountAndSender(uint32 funcId, uint[] array, address wh
 	if (funcId == sellerAuctionBidBatch(uint256[],uint256).selector) {
 		env e;
 		require e.msg.sender == who;
-		sellerAuctionBidBatch(e, array, uint256oracle());
+		uint campaignId = uint256oracle();
+		validStateBuyer(campaignId);
+		sellerAuctionBidBatch(e, array, campaignId);
 	} else {
 		require false;
 	}
-}*/
+}
 
 /*
 // easy to use dispatcher
