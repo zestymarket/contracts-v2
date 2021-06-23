@@ -36,10 +36,4 @@ contract V1Harness is ZestyMarket_ERC20_V1_1 {
         return ret;
     }
 
-
-    function getBuyer(uint256 id) external view returns (address) {
-        address ret;
-        (ret, ) = ZestyMarket_ERC20_V1_1(this).getBuyerCampaign(id);
-        return ret;
-    }
 }

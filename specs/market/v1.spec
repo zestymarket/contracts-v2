@@ -14,8 +14,6 @@ methods {
 	getAuctionPriceStart(uint256) returns uint256 envfree
 	getAuctionPriceEnd(uint256) returns uint256 envfree
 
-	getBuyer(uint256) returns address envfree
-
 	token.balanceOf(address) returns uint256 envfree
 
 	// summarize
@@ -31,12 +29,29 @@ ghost uint256oracle() returns uint256;
 
 ghost buyerCampaignCount() returns uint256;
 
+ghost campaignToBuyer(uint256) returns address;
+
+hook Sload address buyer _buyerCampaigns[KEY uint256 id].(offset 0) STORAGE {
+	require campaignToBuyer(id) == buyer;
+}
+
+hook Sstore _buyerCampaigns[KEY uint256 id].(offset 0) address buyer STORAGE {
+	havoc campaignToBuyer assuming campaignToBuyer@new(id) == buyer &&
+		(forall uint256 id2. id != id2 => campaignToBuyer@new(id2) == campaignToBuyer@old(id2));
+}
+
+
 ghost auctionPrice(uint256) returns uint256;
 
 ghost auctionPriceStart(uint256) returns uint256;
 
 hook Sload uint value _sellerAuctions[KEY uint256 id].(offset 64) STORAGE {
 	require auctionPriceStart(id) == value;
+}
+
+hook Sstore _sellerAuctions[KEY uint256 id].(offset 64) uint value STORAGE {
+	havoc auctionPriceStart assuming auctionPriceStart@new(id) == value &&
+		(forall uint256 id2. id != id2 => auctionPriceStart@new(id2) == auctionPriceStart@old(id2));
 }
 
 // Ghosts are like additional function
@@ -56,17 +71,6 @@ hook Sstore _buyerCampaignCount uint value STORAGE {
 hook Sload uint value _buyerCampaignCount STORAGE {
 	require buyerCampaignCount() == value;
 }
-
-
-// whenever there ia an update to
-//     contractmap[user].deposits[memberAddress] := value
-// where previously contractmap[user].deposits[memberAddress] was old_value
-// update sumDeposits := sumDeposits - old_value + value
-/*hook Sstore contractmap[KEY uint256 s].(offset 0)[KEY uint256 member] uint value (uint old_value) STORAGE {
-    havoc sumDeposits assuming sumDeposits@new(s) == sumDeposits@old(s) + value - old_value &&
-            (forall uint256 other. other != s => sumDeposits@new(other) == sumDeposits@old(other));
-}*/
-
 
 
 ////////////////////////////////////////////////////////////////////////////
@@ -89,14 +93,12 @@ invariant auctionHasPricePendingIfAndOnlyIfHasBuyerCampaign(uint256 auctionId)
 
 
 
-
-
 function validStateAuction(uint auctionId) {
-	require auctionPriceStart(auctionId) >= auctionPrice(auctionId); // TODO: Check
+	require auctionPriceStart(auctionId) >= auctionPrice(auctionId); // TODO: Check in priceShouldAlwaysBeBetweenPriceStartAndPriceEnd
 } 
 
 function validStateBuyer(uint campaignId) {
-	require campaignId == 0 => getBuyer(campaignId) == 0; // TODO and strengthen (to an iff)
+	require campaignId == 0 => campaignToBuyer(campaignId) == 0; // TODO and strengthen (to an iff)
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -166,14 +168,18 @@ rule priceShouldAlwaysBeBetweenPriceStartAndPriceEnd {
 	assert (_auctionPriceStart >= _auctionPrice) && (_auctionPrice >= _auctionPriceEnd);
 }
 
+
+// Status: sanity issue
 rule bidAdditivity(uint x, uint y, address who) {
 	validStateAuction(x);
 	validStateAuction(y);
+	uint256 campaignId = uint256oracle();
+	validStateBuyer(campaignId);
 	additivity(x, y, who, sellerAuctionBidBatch(uint256[],uint256).selector);
 	assert true;
 }
 
-// Status: ghost issue
+// Status: passing including sanity
 rule buyerCampaignCountMonotonicallyIncreasing(method f) {
 	uint pre = buyerCampaignCount();
 
@@ -185,7 +191,10 @@ rule buyerCampaignCountMonotonicallyIncreasing(method f) {
 
 	assert post >= pre;
 	assert post > pre => f.selector == buyerCampaignCreate(string).selector;
+	assert pre != 0 => post != 0;
 }
+
+invariant buyerCampaignCountIsGtZero() buyerCampaignCount() > 0
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Helper Functions                                 //
@@ -193,7 +202,6 @@ rule buyerCampaignCountMonotonicallyIncreasing(method f) {
     
 
 function additivity(uint x, uint y, address who, uint32 funcId) {
-	env e;
 	storage init = lastStorage;
 
 	callFunctionWithAmountAndSender(funcId, [x], who);
@@ -203,7 +211,7 @@ function additivity(uint x, uint y, address who, uint32 funcId) {
 	uint splitMarket = token.balanceOf(currentContract);
 
 	callFunctionWithAmountAndSender(funcId, [x,y], who) at init;
-
+assert false;
 	uint unifiedWho = token.balanceOf(who);
 	uint unifiedMarket = token.balanceOf(currentContract);
 
@@ -215,28 +223,10 @@ function callFunctionWithAmountAndSender(uint32 funcId, uint[] array, address wh
 	if (funcId == sellerAuctionBidBatch(uint256[],uint256).selector) {
 		env e;
 		require e.msg.sender == who;
-		uint campaignId = uint256oracle();
+		uint campaignId; // = uint256oracle();
 		validStateBuyer(campaignId);
 		sellerAuctionBidBatch(e, array, campaignId);
 	} else {
 		require false;
 	}
 }
-
-/*
-// easy to use dispatcher
-function callFunctionWithParams(address token, address from, address to,
- 								uint256 amount, uint256 share, method f) {
-	env e;
-
-	if (f.selector == deposit(address, address, address, uint256, uint256).selector) {
-		deposit(e, token, from, to, amount, share);
-	} else if (f.selector == withdraw(address, address, address, uint256, uint256).selector) {
-		withdraw(e, token, from, to, amount, share); 
-	} else if  (f.selector == transfer(address, address, address, uint256).selector) {
-		transfer(e, token, from, to, share);
-	} else {
-		calldataarg args;
-		f(e,args);
-	}
-}*/
