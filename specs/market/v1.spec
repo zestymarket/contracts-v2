@@ -27,7 +27,6 @@ methods {
 ghost uint8oracle() returns uint8;
 ghost uint256oracle() returns uint256;
 
-ghost buyerCampaignCount() returns uint256;
 
 ghost campaignToBuyer(uint256) returns address;
 
@@ -63,6 +62,8 @@ ghost sumDeposits(uint256) returns uint {
     init_state axiom forall uint256 s. sumDeposits(s) == 0;
 }
 */
+
+ghost buyerCampaignCount() returns uint256;
 
 hook Sstore _buyerCampaignCount uint value STORAGE {
 	havoc buyerCampaignCount assuming buyerCampaignCount@new() == value;
