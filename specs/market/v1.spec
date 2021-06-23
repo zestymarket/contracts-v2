@@ -9,11 +9,15 @@
 using DummyERC20A as token
 
 methods {
+	// harness
     getAuctionPricePending(uint256) returns uint256 envfree
     getAuctionBuyerCampaign(uint256) returns uint256 envfree
 	getAuctionPriceStart(uint256) returns uint256 envfree
 	getAuctionPriceEnd(uint256) returns uint256 envfree
 
+	dummy() envfree
+
+	// token
 	token.balanceOf(address) returns uint256 envfree
 
 	// summarize
@@ -211,8 +215,9 @@ function additivity(uint x, uint y, address who, uint32 funcId) {
 	uint splitWho = token.balanceOf(who);
 	uint splitMarket = token.balanceOf(currentContract);
 
-	callFunctionWithAmountAndSender(funcId, [x,y], who) at init;
-assert false;
+	dummy() at init; // reset the storage
+	callFunctionWithAmountAndSender(funcId, [x,y], who);
+
 	uint unifiedWho = token.balanceOf(who);
 	uint unifiedMarket = token.balanceOf(currentContract);
 

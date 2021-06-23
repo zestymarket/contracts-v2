@@ -36,4 +36,8 @@ contract V1Harness is ZestyMarket_ERC20_V1_1 {
         return ret;
     }
 
+
+    // used for resetting storage in spec
+    function dummy() external {}
+
 }
