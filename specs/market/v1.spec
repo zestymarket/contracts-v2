@@ -11,6 +11,7 @@ using ZestyNFT as nft
 
 methods {
 	getDepositor(uint256) returns (address) envfree
+	getOperator(address) returns (address) envfree
 
 	// harness
     getAuctionPricePending(uint256) returns uint256 envfree
@@ -36,6 +37,9 @@ methods {
 	// dispatcher
 	onERC721Received(address,address,uint256,bytes) => DISPATCHER(true)
 }
+
+definition TRUE() returns uint8 = 2;
+definition FALSE() returns uint8 = 1;
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Ghost                                            //
@@ -138,9 +142,11 @@ hook Sload uint value _sellerAuctionCount STORAGE {
 */
 
 // status: rerun - fails in bidbatch - there's a price end and it just sets it. need to check buyerCampaignApproved too (which is autoset by autoApprove)
-invariant oncePriceEndWasSetPricePendingMustBeZeroAndMustBeApproved(uint256 auctionId) getAuctionPriceEnd(auctionId) != 0 => getAuctionPricePending(auctionId) == 0 && getAuctionCampaignApproved(auctionId) == 2
+// waiting for code to update and remove priceEnd
+invariant oncePriceEndWasSetPricePendingMustBeZeroAndMustBeApproved(uint256 auctionId) getAuctionPriceEnd(auctionId) != 0 => getAuctionPricePending(auctionId) == 0 && getAuctionCampaignApproved(auctionId) == TRUE()
 
 // status: failing because pending and campaign could be nullified but priceEnd was set to something before, should be impossible
+// waiting for new version of code without price end?
 invariant auctionHasPricePendingOrEndIfAndOnlyIfHasBuyerCampaign(uint256 auctionId)
     (getAuctionPricePending(auctionId) != 0 || getAuctionPriceEnd(auctionId) != 0) <=> getAuctionBuyerCampaign(auctionId) != 0 {
 		preserved {
@@ -190,17 +196,20 @@ invariant sellerNFTSettingsMatchSellerAuction(uint256 tokenId, uint256 auctionId
 }
 
 // status: has failures, check them	
-invariant autoApproveValid(uint256 tokenId) (getSellerByTokenId(tokenId) != 0 <=> (getAuctionAutoApproveSetting(tokenId) == 1 || getAuctionAutoApproveSetting(tokenId) == 2)) && getSellerByTokenId(tokenId) == 0 <=> getAuctionAutoApproveSetting(tokenId) == 0
-
-// status: failing when removing an auction
-invariant autoApproveValidIffSellerNonZero(uint256 auctionId) auctionSeller(auctionId) != 0 <=> (getAuctionAutoApproveSetting(auctionToTokenId(auctionId)) == 1 || getAuctionAutoApproveSetting(auctionToTokenId(auctionId)) == 2) {
-	preserved {
-		requireInvariant sellerNFTSettingsMatchSellerAuction(auctionToTokenId(auctionId), auctionId);
-		requireInvariant aboveSellerAuctionCountSellerIsZero(auctionId);
-		requireInvariant depositedNFTsBelongToMarket(auctionToTokenId(auctionId));
+invariant autoApproveValid(uint256 tokenId) (getSellerByTokenId(tokenId) != 0 <=> (getAuctionAutoApproveSetting(tokenId) == FALSE() || getAuctionAutoApproveSetting(tokenId) == TRUE())) && (getSellerByTokenId(tokenId) == 0 <=> getAuctionAutoApproveSetting(tokenId) == 0) {
+	preserved sellerNFTDeposit(uint256 _, uint8 _) with (env e) {
+		require e.msg.sender != 0; // reasonable assumption in evm 
+	}
+	preserved sellerNFTUpdate(uint256 _, uint8 _) with (env e) {
+		require e.msg.sender != 0; // reasonable assumption in evm 
+		// reasonable that 0 cannot be a depositor and cannot assign operators
+		requireInvariant nftDepositorIsSameAsSellerInNFTSettings(tokenId);
+		require getDepositor(tokenId) != 0;
+		require getOperator(0) == 0;
 	}
 }
 
+// status: should be subsumed by autoApproveValid
 rule ifThereIsASellerAutoApproveMustBeOneOrTwo(uint256 auctionId, uint256 tokedId) {
 	env e;
 	address seller;
@@ -214,7 +223,7 @@ function validStateAuction(uint auctionId) {
 } 
 
 function validStateBuyer(uint campaignId) {
-	require aboveBuyerCampaignCountBuyerIsZero()
+	requireInvariant aboveBuyerCampaignCountBuyerIsZero();
 }
 
 ////////////////////////////////////////////////////////////////////////////
