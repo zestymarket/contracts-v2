@@ -442,6 +442,10 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
                 _contractTimeEnd[i] > _auctionTimeEnd[i],
                 "ZestyMarket_ERC20_V2::sellerAuctionCreateBatch: Ending time of the Contract must be greater than the ending time of Auction"
             );
+            require(
+                _contractTimeEnd[i] > _contractTimeStart[i],
+                "ZestyMarket_ERC20_V1::sellerAuctionCreateBatch: Ending time of the Contract must be greater than the starting time of Contract"
+            );
 
             SellerNFTSetting storage s = _sellerNFTSettings[_tokenId];
             s.inProgressCount = s.inProgressCount.add(1);
