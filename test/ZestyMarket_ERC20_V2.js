@@ -475,8 +475,8 @@ describe('ZestyMarket_ERC20_V2', function() {
       expect(data.contractTimeStart).to.equal(timeNow + 101);
       expect(data.contractTimeEnd).to.equal(timeNow + 10001);
       expect(data.priceStart).to.equal(100);
-      expect(data.pricePending).to.equal(98);
-      expect(data.priceEnd).to.equal(0);
+      expect(data.pricePending).to.equal(0);
+      expect(data.priceEnd).to.equal(98);
       expect(data.buyerCampaign).to.equal(1);
       expect(data.buyerCampaignApproved).to.equal(2);
     }
@@ -873,8 +873,8 @@ describe('ZestyMarket_ERC20_V2', function() {
       expect(data.contractTimeStart).to.equal(timeNow + 101);
       expect(data.contractTimeEnd).to.equal(timeNow + 10001);
       expect(data.priceStart).to.equal(100);
-      expect(data.pricePending).to.equal(98);
-      expect(data.priceEnd).to.equal(0);
+      expect(data.pricePending).to.equal(00);
+      expect(data.priceEnd).to.equal(98);
       expect(data.buyerCampaign).to.equal(1);
       expect(data.buyerCampaignApproved).to.equal(2);
     }
