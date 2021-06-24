@@ -124,8 +124,6 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
     struct Contract {
         uint256 sellerAuctionId;
         uint256 buyerCampaignId;
-        uint256 contractTimeStart;
-        uint256 contractTimeEnd;
         uint256 contractValue;
         uint8 withdrawn;
         uint8 refunded;
@@ -281,8 +279,8 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
     {
         sellerAuctionId = _contracts[_contractId].sellerAuctionId;
         buyerCampaignId = _contracts[_contractId].buyerCampaignId;
-        contractTimeStart = _contracts[_contractId].contractTimeStart;
-        contractTimeEnd = _contracts[_contractId].contractTimeEnd;
+        contractTimeStart = _sellerAuctions[sellerAuctionId].contractTimeStart;
+        contractTimeEnd = _sellerAuctions[sellerAuctionId].contractTimeEnd;
         contractValue = _contracts[_contractId].contractValue;
         withdrawn = _contracts[_contractId].withdrawn;
         refunded = _contracts[_contractId].refunded;
@@ -570,11 +568,12 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
 
             // if auto approve is set to true
             if (s.buyerCampaignApproved == _TRUE) {
+                s.pricePending = 0;
+                s.priceEnd = price;
+
                 Contract storage c = _contracts[_contractCount];
                 c.sellerAuctionId = _sellerAuctionId[i];
                 c.buyerCampaignId = _buyerCampaignId;
-                c.contractTimeStart = s.contractTimeStart;
-                c.contractTimeEnd = s.contractTimeEnd;
                 c.contractValue = price;
                 c.refunded = _FALSE;
                 c.withdrawn = _FALSE;
@@ -660,8 +659,6 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
             Contract storage c = _contracts[_contractCount];
             c.sellerAuctionId = _sellerAuctionId[i];
             c.buyerCampaignId = s.buyerCampaign;
-            c.contractTimeStart = s.contractTimeStart;
-            c.contractTimeEnd = s.contractTimeEnd;
             c.contractValue = s.priceEnd;
             c.withdrawn = _FALSE;
             c.refunded = _FALSE;
@@ -804,7 +801,7 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
                 "ZestyMarket_ERC20_V2::contractWithdrawBatch: Invalid contract"
             );
             require(
-                block.timestamp > c.contractTimeEnd, 
+                block.timestamp > s.contractTimeEnd, 
                 "ZestyMarket_ERC20_V2::contractWithdrawBatch: Contract has not ended"
             );
             require(
@@ -897,7 +894,7 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
                 "ZestyMarket_ERC20_V2::contractRefundBatch: Invalid contract"
             );
             require(
-                block.timestamp > c.contractTimeEnd + _gracePeriod, 
+                block.timestamp > s.contractTimeEnd + _gracePeriod, 
                 "ZestyMarket_ERC20_V2::contractRefundBatch: Contract has not ended"
             );
             require(
