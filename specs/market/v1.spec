@@ -45,7 +45,9 @@ ghost uint8oracle() returns uint8;
 ghost uint256oracle() returns uint256;
 
 /////// campaign id to buyer address ghost
-ghost campaignToBuyer(uint256) returns address;
+ghost campaignToBuyer(uint256) returns address {
+	init_state axiom forall uint256 x. campaignToBuyer(x) == 0;
+}
 
 hook Sload address buyer _buyerCampaigns[KEY uint256 id].(offset 0) STORAGE {
 	require campaignToBuyer(id) == buyer;
@@ -154,7 +156,7 @@ invariant depositedNFTsBelongToMarket(uint256 tokenId) getSellerByTokenId(tokenI
 // status: passed, including sanity
 invariant aboveSellerAuctionCountSellerIsZero(uint256 auctionId) auctionId >= sellerAuctionCount() => auctionSeller(auctionId) == 0
 
-// status: running
+// status: passed
 invariant aboveBuyerCampaignCountBuyerIsZero(uint256 campaignId) (campaignId >= buyerCampaignCount() => campaignToBuyer(campaignId) == 0) && campaignToBuyer(0) == 0 {
 	preserved {
 		requireInvariant buyerCampaignCountIsGtZero();
@@ -188,7 +190,7 @@ invariant sellerNFTSettingsMatchSellerAuction(uint256 tokenId, uint256 auctionId
 }
 
 // status: has failures, check them	
-invariant autoApproveValid(uint256 tokenId) getSellerByTokenId(tokenId) != 0 <=> (getAuctionAutoApproveSetting(tokenId) == 1 || getAuctionAutoApproveSetting(tokenId) == 2)
+invariant autoApproveValid(uint256 tokenId) (getSellerByTokenId(tokenId) != 0 <=> (getAuctionAutoApproveSetting(tokenId) == 1 || getAuctionAutoApproveSetting(tokenId) == 2)) && getSellerByTokenId(tokenId) == 0 <=> getAuctionAutoApproveSetting(tokenId) == 0
 
 // status: failing when removing an auction
 invariant autoApproveValidIffSellerNonZero(uint256 auctionId) auctionSeller(auctionId) != 0 <=> (getAuctionAutoApproveSetting(auctionToTokenId(auctionId)) == 1 || getAuctionAutoApproveSetting(auctionToTokenId(auctionId)) == 2) {
@@ -212,8 +214,7 @@ function validStateAuction(uint auctionId) {
 } 
 
 function validStateBuyer(uint campaignId) {
-	// use invaraint aboveBuyerCampaignCountBuyerIsZero
-	require campaignId == 0 => campaignToBuyer(campaignId) == 0; // TODO and strengthen (to an iff)
+	require aboveBuyerCampaignCountBuyerIsZero()
 }
 
 ////////////////////////////////////////////////////////////////////////////
