@@ -195,7 +195,7 @@ invariant sellerNFTSettingsMatchSellerAuction(uint256 tokenId, uint256 auctionId
 	}
 }
 
-// status: has failures, check them	
+// status: passes
 invariant autoApproveValid(uint256 tokenId) (getSellerByTokenId(tokenId) != 0 <=> (getAuctionAutoApproveSetting(tokenId) == FALSE() || getAuctionAutoApproveSetting(tokenId) == TRUE())) && (getSellerByTokenId(tokenId) == 0 <=> getAuctionAutoApproveSetting(tokenId) == 0) {
 	preserved sellerNFTDeposit(uint256 _, uint8 _) with (env e) {
 		require e.msg.sender != 0; // reasonable assumption in evm 
