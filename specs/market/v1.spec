@@ -128,12 +128,54 @@ hook Sload uint value _sellerAuctionCount STORAGE {
 	require sellerAuctionCount() == value;
 }
 
+/////// contract value
+ghost contractToValue(uint256) returns uint256;
+
+/////// contract value sum
+ghost contractValueSum() returns uint256;
+
+hook Sstore _contracts[KEY uint256 contractId].(offset 128) uint256 value (uint256 oldValue) STORAGE {
+	havoc contractToValue assuming contractToValue@new(contractId) == value &&
+		(forall uint256 id2. id2 != contractId => contractToValue@new(id2) == contractToValue@old(id2));
+	havoc contractValueSum assuming contractValueSum@new() == contractValueSum@old() - oldValue + value;
+	havoc contractValueWithdrawnSum assuming contractValueWithdrawnSum@new() == ((isContractWithdrawn(contractId)==TRUE()) 
+		? (contractValueWithdrawnSum@old() - oldValue + value) 
+		: contractValueWithdrawnSum@old());
+}
+
+hook Sload uint256 value _contracts[KEY uint256 contractId].(offset 128) STORAGE {
+	require contractToValue(contractId) == value;
+	require contractValueSum() >= value;
+	require (isContractWithdrawn(contractId)==TRUE()) ? contractValueWithdrawnSum() >= value : true;
+}
+
+/////// contract id to whether it's withdrawn or not
+ghost isContractWithdrawn(uint256) returns uint8;
+
+hook Sstore _contracts[KEY uint256 contractId].(offset 160) uint8 value (uint8 oldValue) STORAGE {
+	havoc isContractWithdrawn assuming isContractWithdrawn@new(contractId) == value &&
+		(forall uint256 id2. id2 != contractId => isContractWithdrawn@new(id2) == isContractWithdrawn@old(id2));
+
+	havoc contractValueWithdrawnSum assuming (
+		(value == oldValue => contractValueWithdrawnSum@new() == contractValueWithdrawnSum@old())
+		&& (value == TRUE() && oldValue == FALSE() => contractValueWithdrawnSum@new() == contractValueWithdrawnSum@old() + contractToValue(contractId))
+		&& (value == FALSE() && value == TRUE() => contractValueWithdrawnSum@new() == contractValueWithdrawnSum@old() - contractToValue(contractId))
+	);
+}
+
+hook Sload uint8 value _contracts[KEY uint256 contractId].(offset 160) STORAGE {
+	require isContractWithdrawn(contractId) == value;
+}
+
+/////// contract value sum for withdrawn only
+ghost contractValueWithdrawnSum() returns uint256;
+
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Invariants                                       //
 ////////////////////////////////////////////////////////////////////////////
 
-
+invariant sanityContractValueSumGhosts() contractValueSum() >= contractValueWithdrawnSum()
 
 /* 	Rule: title  
  	Description:  
