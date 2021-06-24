@@ -42,12 +42,29 @@ contract V1Harness is ZestyMarket_ERC20_V1_1 {
         return ret;
     }
 
+    function getAuctionCampaignApproved(uint256 id) external view returns (uint8) {
+        uint8 ret;
+        (, , , , , , , , , , ret) = ZestyMarket_ERC20_V1_1(this).getSellerAuction(id);
+        return ret;
+    }
+
     function getAuctionAutoApproveSetting(uint256 tokenId) external view returns (uint256) {
         uint8 ret;
         (, , ret, ) = ZestyMarket_ERC20_V1_1(this).getSellerNFTSetting(tokenId);
         return ret;
     }
 
+    function getSellerByTokenId(uint256 tokenId) external view returns (address) {
+        address ret;
+        ( , ret, , ) = ZestyMarket_ERC20_V1_1(this).getSellerNFTSetting(tokenId);
+        return ret;
+    }
+
+    function getInProgress(uint256 tokenId) external view returns (uint256) {
+        uint256 ret;
+        (, , , ret) = ZestyMarket_ERC20_V1_1(this).getSellerNFTSetting(tokenId);
+        return ret;
+    }
 
     // used for resetting storage in spec
     function dummy() external {}
