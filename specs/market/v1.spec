@@ -14,6 +14,7 @@ methods {
     getAuctionBuyerCampaign(uint256) returns uint256 envfree
 	getAuctionPriceStart(uint256) returns uint256 envfree
 	getAuctionPriceEnd(uint256) returns uint256 envfree
+	getAuctionAutoApproveSetting(uint256) returns uint256 envfree
 
 	dummy() envfree
 
@@ -94,9 +95,13 @@ hook Sload uint value _buyerCampaignCount STORAGE {
 invariant auctionHasPricePendingIfAndOnlyIfHasBuyerCampaign(uint256 auctionId)
     getAuctionPricePending(auctionId) != 0 <=> getAuctionBuyerCampaign(auctionId) != 0
 
+rule ifThereIsASellerAutoApproveMustBeOneOrTwo(uint256 auctionId, uint256 tokedId) {
+	env e;
+	address seller;
 
-
-
+	seller, _, _, _, _, _, _, _, _, _, _ = getSellerAuction(e, auctionId);
+	assert seller != 0 <=> getAuctionAutoApproveSetting(tokedId) != 0;
+}
 
 function validStateAuction(uint auctionId) {
 	require auctionPriceStart(auctionId) >= auctionPrice(auctionId); // TODO: Check in priceShouldAlwaysBeBetweenPriceStartAndPriceEnd
@@ -175,7 +180,7 @@ rule priceShouldAlwaysBeBetweenPriceStartAndPriceEnd {
 
 
 // Status: sanity issue
-rule bidAdditivity(uint x, uint y, address who) {
+/*rule bidAdditivity(uint x, uint y, address who) {
 	validStateAuction(x);
 	validStateAuction(y);
 	uint256 campaignId = uint256oracle();
@@ -199,14 +204,14 @@ rule buyerCampaignCountMonotonicallyIncreasing(method f) {
 	assert pre != 0 => post != 0;
 }
 
-invariant buyerCampaignCountIsGtZero() buyerCampaignCount() > 0
+invariant buyerCampaignCountIsGtZero() buyerCampaignCount() > 0*/
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Helper Functions                                 //
 ////////////////////////////////////////////////////////////////////////////
     
 
-function additivity(uint x, uint y, address who, uint32 funcId) {
+/*function additivity(uint x, uint y, address who, uint32 funcId) {
 	storage init = lastStorage;
 
 	callFunctionWithAmountAndSender(funcId, [x], who);
@@ -223,9 +228,9 @@ function additivity(uint x, uint y, address who, uint32 funcId) {
 
 	assert splitWho == unifiedWho, "operation is not additive for the given address balance";
 	assert splitMarket == unifiedMarket, "operation is not additive for the market balance";
-}
+}*/
 
-function callFunctionWithAmountAndSender(uint32 funcId, uint[] array, address who) {
+/*function callFunctionWithAmountAndSender(uint32 funcId, uint[] array, address who) {
 	if (funcId == sellerAuctionBidBatch(uint256[],uint256).selector) {
 		env e;
 		require e.msg.sender == who;
@@ -235,4 +240,4 @@ function callFunctionWithAmountAndSender(uint32 funcId, uint[] array, address wh
 	} else {
 		require false;
 	}
-}
+}*/
