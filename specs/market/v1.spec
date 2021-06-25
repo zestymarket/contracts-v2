@@ -132,7 +132,9 @@ hook Sload uint value _sellerAuctionCount STORAGE {
 ghost contractToValue(uint256) returns uint256;
 
 /////// contract value sum
-ghost contractValueSum() returns uint256;
+ghost contractValueSum() returns uint256 {
+	init_state axiom contractValueSum() == 0;
+}
 
 hook Sstore _contracts[KEY uint256 contractId].(offset 128) uint256 value (uint256 oldValue) STORAGE {
 	havoc contractToValue assuming contractToValue@new(contractId) == value &&
@@ -168,7 +170,9 @@ hook Sload uint8 value _contracts[KEY uint256 contractId].(offset 160) STORAGE {
 }
 
 /////// contract value sum for withdrawn only
-ghost contractValueWithdrawnSum() returns uint256;
+ghost contractValueWithdrawnSum() returns uint256 {
+	init_state axiom contractValueWithdrawnSum() == 0;
+}
 
 
 ////////////////////////////////////////////////////////////////////////////
