@@ -140,13 +140,16 @@ hook Sload uint value _contractCount STORAGE {
 }
 
 /////// contract value
-ghost contractToValue(uint256) returns uint256;
+ghost contractToValue(uint256) returns uint256 {
+	init_state axiom forall uint256 id. contractToValue(id) == 0;
+}
 
 /////// contract value sum
 ghost contractValueSum() returns uint256 {
 	init_state axiom contractValueSum() == 0;
 }
 
+// hooks for contract value
 hook Sstore _contracts[KEY uint256 contractId].(offset 128) uint256 value (uint256 oldValue) STORAGE {
 	requireInvariant aboveContractCountContractValueIsZero(contractId);
 	havoc contractToValue assuming contractToValue@new(contractId) == value &&
@@ -164,11 +167,13 @@ hook Sload uint256 value _contracts[KEY uint256 contractId].(offset 128) STORAGE
 }
 
 /////// contract id to whether it's withdrawn or not
-ghost isContractWithdrawn(uint256) returns uint8;
+ghost isContractWithdrawn(uint256) returns uint8 {
+	init_state axiom forall uint256 id. isContractWithdrawn(id) == 0;
+}
 
+// hooks for contract withdrawn
 hook Sstore _contracts[KEY uint256 contractId].(offset 160) uint8 value (uint8 oldValue) STORAGE {
 	// valid values - need to prove
-	//require value == FALSE() || value == TRUE();
 	require oldValue == FALSE() || value == TRUE();
 
 	havoc isContractWithdrawn assuming isContractWithdrawn@new(contractId) == value &&
@@ -201,6 +206,7 @@ ghost contractValueWithdrawnSum() returns uint256 {
 //                       Invariants                                       //
 ////////////////////////////////////////////////////////////////////////////
 
+// status: passing
 invariant sanityContractValueSumGhosts() contractValueSum() >= contractValueWithdrawnSum()
 
 /* 	Rule: title  
@@ -237,7 +243,7 @@ invariant aboveBuyerCampaignCountBuyerIsZero(uint256 campaignId) (campaignId >= 
 	}
 }
 
-// status to run
+// Status: passes
 invariant aboveContractCountContractValueIsZero(uint256 contractId) contractId >= contractCount() => contractToValue(contractId) == 0 && isContractWithdrawn(contractId) == 0
 
 // status: passing, check sanity
@@ -267,7 +273,9 @@ invariant sellerNFTSettingsMatchSellerAuction(uint256 tokenId, uint256 auctionId
 }
 
 // status: passes
-invariant autoApproveValid(uint256 tokenId) (getSellerByTokenId(tokenId) != 0 <=> (getAuctionAutoApproveSetting(tokenId) == FALSE() || getAuctionAutoApproveSetting(tokenId) == TRUE())) && (getSellerByTokenId(tokenId) == 0 <=> getAuctionAutoApproveSetting(tokenId) == 0) {
+invariant autoApproveValid(uint256 tokenId)
+	(getSellerByTokenId(tokenId) != 0 <=> (getAuctionAutoApproveSetting(tokenId) == FALSE() || getAuctionAutoApproveSetting(tokenId) == TRUE())) 
+		&& (getSellerByTokenId(tokenId) == 0 <=> getAuctionAutoApproveSetting(tokenId) == 0) {
 	preserved sellerNFTDeposit(uint256 _, uint8 _) with (env e) {
 		require e.msg.sender != 0; // reasonable assumption in evm 
 	}
@@ -359,7 +367,7 @@ rule priceShouldAlwaysBeBetweenPriceStartAndPriceEnd {
 
 	_auctionPriceStart = getAuctionPriceStart(args);
 	_auctionPriceEnd = getAuctionPriceEnd(args);
-	_auctionPrice = getSellerAuctionPrice(e, args);
+	_auctionPrice = getSellerAuctionPriceOriginal(e, args);
 
 	assert (_auctionPriceStart >= _auctionPrice) && (_auctionPrice >= _auctionPriceEnd);
 }
