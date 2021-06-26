@@ -288,15 +288,6 @@ invariant autoApproveValid(uint256 tokenId)
 	}
 }
 
-// status: should be subsumed by autoApproveValid
-rule ifThereIsASellerAutoApproveMustBeOneOrTwo(uint256 auctionId, uint256 tokedId) {
-	env e;
-	address seller;
-
-	seller, _, _, _, _, _, _, _, _, _, _ = getSellerAuction(e, auctionId);
-	assert seller != 0 <=> getAuctionAutoApproveSetting(tokedId) != 0;
-}
-
 function validStateAuction(uint auctionId) {
 	require auctionPriceStart(auctionId) >= auctionPrice(auctionId); // TODO: Check in priceShouldAlwaysBeBetweenPriceStartAndPriceEnd
 } 
@@ -308,70 +299,6 @@ function validStateBuyer(uint campaignId) {
 ////////////////////////////////////////////////////////////////////////////
 //                       Rules                                            //
 ////////////////////////////////////////////////////////////////////////////
-    
-rule auctionAutoApprovalCanBeTrueOrFalse(uint256 _tokenId) {
-
-	env e;
-
-	uint8 _autoApproveTrue = 2;
-	uint8 _autoApproveFalse = 1;
-	uint8 _autoApproveOther = 0;
-
-	require _tokenId > 0;
-	require e.msg.value == 0;
-
-	sellerNFTDeposit(e, _tokenId, _autoApproveTrue);
-	assert true;
-
-	sellerNFTDeposit(e, _tokenId, _autoApproveFalse);
-	assert true;
-
-	sellerNFTDeposit(e, _tokenId, _autoApproveOther);
-	assert false;
-}
-
-rule auctionAutoApprovalCanBeTrueOrFalseA(uint256 _tokenId) {
-
-	env e;
-
-	uint8 _autoApproveTrue = 2;
-	uint8 _autoApproveFalse = 1;
-	uint8 _autoApproveOther = 0;
-
-	require _tokenId > 0;
-	require e.msg.value == 0;
-
-	sellerNFTDeposit@withrevert(e, _tokenId, _autoApproveTrue);
-	assert !lastReverted;
-
-	sellerNFTDeposit@withrevert(e, _tokenId, _autoApproveFalse);
-	assert !lastReverted;
-
-	sellerNFTDeposit@withrevert(e, _tokenId, _autoApproveOther);
-	assert lastReverted;
-}
-
-rule priceShouldAlwaysBeBetweenPriceStartAndPriceEnd {
-	env e;
-	calldataarg args;
-
-	uint256 _sellerAuctionId;
-	uint256 _auctionPriceStart;
-	uint256 _auctionPriceEnd;
-	uint256 _auctionPrice;
-
-	sellerNFTDeposit(e, args);
-	sellerAuctionCreateBatch(e, args);
-	buyerCampaignCreate(e, args);
-	sellerAuctionBidBatch(e, args);
-
-	_auctionPriceStart = getAuctionPriceStart(args);
-	_auctionPriceEnd = getAuctionPriceEnd(args);
-	_auctionPrice = getSellerAuctionPriceOriginal(e, args);
-
-	assert (_auctionPriceStart >= _auctionPrice) && (_auctionPrice >= _auctionPriceEnd);
-}
-
 
 // Status: sanity issue
 rule bidAdditivity(uint x, uint y, address who) {
@@ -380,6 +307,46 @@ rule bidAdditivity(uint x, uint y, address who) {
 	uint256 campaignId = uint256oracle();
 	validStateBuyer(campaignId);
 	additivity(x, y, who, sellerAuctionBidBatch(uint256[],uint256).selector);
+	assert true;
+}
+
+// Status: Passing including Sanity
+rule auctionApproveAdditivity(uint x, uint y, address who) {
+	validStateAuction(x);
+	validStateAuction(y);
+	uint256 campaignId = uint256oracle();
+	validStateBuyer(campaignId);
+	additivity(x, y, who, sellerAuctionApproveBatch(uint256[]).selector);
+	assert true;
+}
+
+// Status: sanity issue
+rule auctionBidCancelAdditivity(uint x, uint y, address who) {
+	validStateAuction(x);
+	validStateAuction(y);
+	uint256 campaignId = uint256oracle();
+	validStateBuyer(campaignId);
+	additivity(x, y, who, sellerAuctionBidCancelBatch(uint256[]).selector);
+	assert true;
+}
+
+// Status: sanity issue
+rule auctionRejectBatchAdditivity(uint x, uint y, address who) {
+	validStateAuction(x);
+	validStateAuction(y);
+	uint256 campaignId = uint256oracle();
+	validStateBuyer(campaignId);
+	additivity(x, y, who, sellerAuctionRejectBatch(uint256[]).selector);
+	assert true;
+}
+
+// Status: Passing including Sanity
+rule contractWithdrawBatchAdditivity(uint x, uint y, address who) {
+	validStateAuction(x);
+	validStateAuction(y);
+	uint256 campaignId = uint256oracle();
+	validStateBuyer(campaignId);
+	additivity(x, y, who, contractWithdrawBatch(uint256[]).selector);
 	assert true;
 }
 
@@ -416,6 +383,20 @@ rule sellerAuctionCountMonotonicallyIncreasing(method f) {
 
 invariant sellerAuctionCountIsGtZero() sellerAuctionCount() > 0
 
+// Status: passing including sanity
+rule sellerAuctionPriceMonotonicallyDecreasing(method f, uint auctionId) {
+	uint pre = auctionPrice(auctionId);
+
+	env e;
+	calldataarg arg;
+	f(e, arg);
+
+	uint post = auctionPrice(auctionId);
+
+	assert post <= pre;
+	assert pre !=0 => post != 0;
+}
+
 ////////////////////////////////////////////////////////////////////////////
 //                       Helper Functions                                 //
 ////////////////////////////////////////////////////////////////////////////
@@ -447,6 +428,30 @@ function callFunctionWithAmountAndSender(uint32 funcId, uint[] array, address wh
 		uint campaignId; // = uint256oracle();
 		validStateBuyer(campaignId);
 		sellerAuctionBidBatch(e, array, campaignId);
+	} else if (funcId == sellerAuctionApproveBatch(uint256[]).selector) {
+		env e;
+		require e.msg.sender == who;
+		uint campaignId; // = uint256oracle();
+		validStateBuyer(campaignId);
+		sellerAuctionApproveBatch(e, array);
+	} else if (funcId == sellerAuctionBidCancelBatch(uint256[]).selector) {
+		env e;
+		require e.msg.sender == who;
+		uint campaignId; // = uint256oracle();
+		validStateBuyer(campaignId);
+		sellerAuctionBidCancelBatch(e, array);
+	} else if (funcId == sellerAuctionRejectBatch(uint256[]).selector) {
+		env e;
+		require e.msg.sender == who;
+		uint campaignId; // = uint256oracle();
+		validStateBuyer(campaignId);
+		sellerAuctionRejectBatch(e, array);
+	} else if (funcId == contractWithdrawBatch(uint256[]).selector) {
+		env e;
+		require e.msg.sender == who;
+		uint campaignId; // = uint256oracle();
+		validStateBuyer(campaignId);
+		contractWithdrawBatch(e, array);
 	} else {
 		require false;
 	}
