@@ -42,6 +42,30 @@ contract V1Harness is ZestyMarket_ERC20_V1_1 {
         return ret;
     }
 
+    function getAuctionTimeStart(uint256 id) external view returns (uint256) {
+        uint256 ret;
+        (, , ret, , , , , , , , ) = ZestyMarket_ERC20_V1_1(this).getSellerAuction(id);
+        return ret;
+    }
+
+    function getAuctionTimeEnd(uint256 id) external view returns (uint256) {
+        uint256 ret;
+        (, , , ret, , , , , , , ) = ZestyMarket_ERC20_V1_1(this).getSellerAuction(id);
+        return ret;
+    }
+
+    function getContractTimeStart(uint256 id) external view returns (uint256) {
+        uint256 ret;
+        (, , , , ret, , , , , , ) = ZestyMarket_ERC20_V1_1(this).getSellerAuction(id);
+        return ret;
+    }
+
+    function getContractTimeEnd(uint256 id) external view returns (uint256) {
+        uint256 ret;
+        (, , , , , ret, , , , , ) = ZestyMarket_ERC20_V1_1(this).getSellerAuction(id);
+        return ret;
+    }
+
     function getAuctionAutoApproveSetting(uint256 tokenId) external view returns (uint256) {
         uint8 ret;
         (, , ret, ) = ZestyMarket_ERC20_V1_1(this).getSellerNFTSetting(tokenId);
@@ -57,6 +81,12 @@ contract V1Harness is ZestyMarket_ERC20_V1_1 {
     function getInProgress(uint256 tokenId) external view returns (uint256) {
         uint256 ret;
         (, , , ret) = ZestyMarket_ERC20_V1_1(this).getSellerNFTSetting(tokenId);
+        return ret;
+    }
+
+    function getBuyer(uint256 campaignId) external view returns (address) {
+        address ret;
+        (ret, ) = ZestyMarket_ERC20_V1_1(this).getBuyerCampaign(campaignId);
         return ret;
     }
 

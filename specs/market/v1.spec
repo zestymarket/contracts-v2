@@ -20,8 +20,13 @@ methods {
 	getAuctionPriceEnd(uint256) returns uint256 envfree
 	getAuctionCampaignApproved(uint256) returns uint8 envfree
 	getAuctionAutoApproveSetting(uint256) returns uint256 envfree
+	getAuctionTimeStart(uint256) returns uint256 envfree
+	getAuctionTimeEnd(uint256) returns uint256 envfree
+	getContractTimeStart(uint256) returns uint256 envfree
+	getContractTimeEnd(uint256) returns uint256 envfree
 	getSellerByTokenId(uint256) returns address envfree
 	getInProgress(uint256) returns uint256 envfree
+	getBuyer(uint256) returns address envfree
 
 	dummy() envfree
 
@@ -42,8 +47,7 @@ definition FALSE() returns uint8 = 1;
 //                       Ghost                                            //
 ////////////////////////////////////////////////////////////////////////////
 
-ghost uint8oracle() returns uint8;
-ghost uint256oracle() returns uint256;
+//ghost uint256oracle() returns uint256;
 
 /////// campaign id to buyer address ghost
 ghost campaignToBuyer(uint256) returns address {
@@ -62,11 +66,11 @@ hook Sstore _buyerCampaigns[KEY uint256 id].(offset 0) address buyer STORAGE {
 /////// auction price start ghost
 ghost auctionPriceStart(uint256) returns uint256;
 
-hook Sload uint value _sellerAuctions[KEY uint256 id].(offset 64) STORAGE {
+hook Sload uint value _sellerAuctions[KEY uint256 id].(offset 192) STORAGE {
 	require auctionPriceStart(id) == value;
 }
 
-hook Sstore _sellerAuctions[KEY uint256 id].(offset 64) uint value STORAGE {
+hook Sstore _sellerAuctions[KEY uint256 id].(offset 192) uint value STORAGE {
 	havoc auctionPriceStart assuming auctionPriceStart@new(id) == value &&
 		(forall uint256 id2. id != id2 => auctionPriceStart@new(id2) == auctionPriceStart@old(id2));
 }
@@ -195,6 +199,30 @@ ghost contractValueWithdrawnSum() returns uint256 {
 	init_state axiom contractValueWithdrawnSum() == 0;
 }
 
+/////// sum of pending prices
+ghost pendingPricesSum() returns uint256 {
+	init_state axiom pendingPricesSum() == 0;
+}
+
+hook Sstore _sellerAuctions[KEY uint256 auctionId].(offset 224) uint value (uint oldValue) STORAGE {
+	havoc pendingPricesSum assuming pendingPricesSum@new() == pendingPricesSum@old() - oldValue + value;
+}
+
+hook Sload uint value _sellerAuctions[KEY uint256 auctionId].(offset 224) STORAGE {
+	require pendingPricesSum() >= value;
+}
+
+ghost endingPricesSum() returns uint256 {
+	init_state axiom endingPricesSum() == 0;
+}
+
+hook Sstore _sellerAuctions[KEY uint256 auctionId].(offset 256) uint value (uint oldValue) STORAGE {
+	havoc endingPricesSum assuming endingPricesSum@new() == endingPricesSum@old() - oldValue + value;
+}
+
+hook Sload uint value _sellerAuctions[KEY uint256 auctionId].(offset 256) STORAGE {
+	require endingPricesSum() >= value;
+}
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Invariants                                       //
@@ -203,8 +231,53 @@ ghost contractValueWithdrawnSum() returns uint256 {
 // status: passing
 invariant sanityContractValueSumGhosts() contractValueSum() >= contractValueWithdrawnSum()
 
+invariant solvency() token.balanceOf(currentContract) >= contractValueSum() - contractValueWithdrawnSum()
+/*
+invariant solvency() token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum() {
+	preserved sellerAuctionBidBatch(uint256[] dummy, uint256 campaignId) with (env e) {
+		require getBuyer(campaignId) != currentContract; // market must not be the buyer
+	}
+}
+*/
+// as solvency as an invariant requires some new spec features, we will write it as a rule
+// status: passed, but this is the wrong rule - there is double counting in contracts that must be addressed
+rule weakSolvency(method f) filtered { f -> !f.isFallback } {
+	require token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum();
+
+	env e;
+	calldataarg arg;
+	if (f.selector == sellerAuctionBidBatch(uint256[],uint256).selector) {
+		uint256[] dummy;
+		uint256 campaignId;
+		require getBuyer(campaignId) != currentContract; // market must not be the buyer
+		sellerAuctionBidBatch(e, dummy, campaignId);
+	} else {
+		f(e, arg);
+	}
+
+	assert token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum();
+}
+
+// status: passing modulo second assumption that has to be proven
+invariant eitherPendingPriceOrEndPriceAreZero(uint256 auctionId) getAuctionPricePending(auctionId) == 0 || getAuctionPriceEnd(auctionId) == 0 {
+	preserved {
+		requireInvariant aboveSellerAuctionCountSellerAndPricesAreZero(auctionId);
+		requireInvariant beforeBidThereIsNoPriceEnd(auctionId);
+	}
+}
+
+// status: running
+invariant beforeBidThereIsNoPriceEnd(uint256 auctionId) 
+	getAuctionBuyerCampaign(auctionId) == 0 => 
+		getAuctionPriceEnd(auctionId) == 0 
+		&& getAuctionPricePending(auctionId) == 0 {
+	preserved {
+		requireInvariant buyerCampaignCountIsGtZero();
+		requireInvariant aboveSellerAuctionCountSellerAndPricesAreZero(auctionId);
+	}
+}
+
 /* 	Rule: title  
- 	Description:  
 	Formula: 
 	Notes: assumptions and simplification more explanations 
 */
@@ -228,7 +301,12 @@ invariant auctionHasPricePendingOrEndIfAndOnlyIfHasBuyerCampaign(uint256 auction
 invariant depositedNFTsBelongToMarket(uint256 tokenId) getSellerByTokenId(tokenId) != 0 => nft.ownerOf(tokenId) == currentContract
 
 // status: passed, including sanity
-invariant aboveSellerAuctionCountSellerIsZero(uint256 auctionId) auctionId >= sellerAuctionCount() => auctionSeller(auctionId) == 0
+invariant aboveSellerAuctionCountSellerAndPricesAreZero(uint256 auctionId) 
+	auctionId >= sellerAuctionCount() => 
+		auctionSeller(auctionId) == 0 
+		&& getAuctionPriceStart(auctionId) == 0 
+		&& getAuctionPricePending(auctionId) == 0 
+		&& getAuctionPriceEnd(auctionId) == 0
 
 // status: passed
 invariant aboveBuyerCampaignCountBuyerIsZero(uint256 campaignId) (campaignId >= buyerCampaignCount() => campaignToBuyer(campaignId) == 0) && campaignToBuyer(0) == 0 {
@@ -282,8 +360,15 @@ invariant autoApproveValid(uint256 tokenId)
 	}
 }
 
-function validStateAuction(uint auctionId) {
-	require auctionPriceStart(auctionId) >= auctionPrice(auctionId); // TODO: Check in priceShouldAlwaysBeBetweenPriceStartAndPriceEnd
+// status: failing on create - bug found by the team after we asked them
+invariant times(uint256 auctionId) auctionSeller(auctionId) != 0 => getAuctionTimeEnd(auctionId) > getAuctionTimeStart(auctionId)
+	&& getContractTimeEnd(auctionId) > getAuctionTimeEnd(auctionId)
+	&& getContractTimeStart(auctionId) >= getAuctionTimeStart(auctionId)
+	&& getContractTimeEnd(auctionId) > getContractTimeStart(auctionId)
+
+
+function validStateAuction(uint auctionId, env e) {
+	require auctionPriceStart(auctionId) >= getSellerAuctionPrice(e, auctionId); // TODO: Check in priceShouldAlwaysBeBetweenPriceStartAndPriceEnd
 } 
 
 function validStateBuyer(uint campaignId) {
@@ -296,35 +381,39 @@ function validStateBuyer(uint campaignId) {
 
 // Status: passing
 rule bidAdditivity(uint x, uint y, address who) {
-	validStateAuction(x);
-	validStateAuction(y);
-	uint256 campaignId = uint256oracle();
-	validStateBuyer(campaignId);
-	additivity(x, y, who, sellerAuctionBidBatch(uint256[],uint256).selector);
+	env eWhen;
+	validStateAuction(x, eWhen);
+	validStateAuction(y, eWhen);
+//	uint256 campaignId = uint256oracle();
+//	validStateBuyer(campaignId);
+	additivity(x, y, who, eWhen.block.timestamp, sellerAuctionBidBatch(uint256[],uint256).selector);
 	assert true;
 }
 
 // Status: Sanity issue
 rule auctionApproveAdditivity(uint x, uint y, address who) {
-	validStateAuction(x);
-	validStateAuction(y);
-	additivity(x, y, who, sellerAuctionApproveBatch(uint256[]).selector);
+	env eWhen;
+	validStateAuction(x, eWhen);
+	validStateAuction(y, eWhen);
+	additivity(x, y, who, eWhen.block.timestamp, sellerAuctionApproveBatch(uint256[]).selector);
 	assert true;
 }
 
 // Status: passed
 rule auctionBidCancelAdditivity(uint x, uint y, address who) {
-	validStateAuction(x);
-	validStateAuction(y);
-	additivity(x, y, who, sellerAuctionBidCancelBatch(uint256[]).selector);
+	env eWhen;
+	validStateAuction(x, eWhen);
+	validStateAuction(y, eWhen);
+	additivity(x, y, who, eWhen.block.timestamp, sellerAuctionBidCancelBatch(uint256[]).selector);
 	assert true;
 }
 
 // Status: passed
 rule auctionRejectBatchAdditivity(uint x, uint y, address who) {
-	validStateAuction(x);
-	validStateAuction(y);
-	additivity(x, y, who, sellerAuctionRejectBatch(uint256[]).selector);
+	env eWhen;
+	validStateAuction(x, eWhen);
+	validStateAuction(y, eWhen);
+	additivity(x, y, who, eWhen.block.timestamp, sellerAuctionRejectBatch(uint256[]).selector);
 	assert true;
 }
 
@@ -332,7 +421,8 @@ rule auctionRejectBatchAdditivity(uint x, uint y, address who) {
 rule contractWithdrawBatchAdditivity(uint x, uint y, address who) {
 	//validStateAuction(x);
 	//validStateAuction(y);
-	additivity(x, y, who, contractWithdrawBatch(uint256[]).selector);
+	uint when;
+	additivity(x, y, who, when, contractWithdrawBatch(uint256[]).selector);
 	assert true;
 }
 
@@ -353,6 +443,7 @@ rule buyerCampaignCountMonotonicallyIncreasing(method f) filtered { f -> !f.isFa
 
 invariant buyerCampaignCountIsGtZero() buyerCampaignCount() > 0
 
+// status: passing
 rule sellerAuctionCountMonotonicallyIncreasing(method f) filtered { f -> !f.isFallback } {
 	uint pre = sellerAuctionCount();
 
@@ -369,41 +460,96 @@ rule sellerAuctionCountMonotonicallyIncreasing(method f) filtered { f -> !f.isFa
 
 invariant sellerAuctionCountIsGtZero() sellerAuctionCount() > 0
 
-// Status: passing including sanity
+// Status: retest
 rule sellerAuctionPriceMonotonicallyDecreasing(method f, uint auctionId) filtered { f -> !f.isFallback } {
-	uint pre = auctionPrice(auctionId);
+	env eGet;
+	uint pre = getSellerAuctionPriceOriginal(eGet, auctionId);
+
+	env e;
+	require e.block.timestamp == eGet.block.timestamp;
+	calldataarg arg;
+	f(e, arg);
+
+	uint post = getSellerAuctionPriceOriginal(eGet, auctionId);
+
+	assert post <= pre;
+	assert pre != 0 => post != 0;
+}
+
+// status: passing
+rule sellerAuctionPriceMonotonicallyDecreasingInTime(uint auctionId) {
+	env e1;
+	env e2;
+	require e1.block.timestamp <= e2.block.timestamp;
+
+	uint before = getSellerAuctionPriceOriginal(e1, auctionId);
+	uint after = getSellerAuctionPriceOriginal(e2, auctionId);
+
+	assert before >= after;
+}
+
+// Status: passing
+rule sellerAuctionPriceStartsAtPriceStart(uint auctionId) {
+	env e;
+	uint price = getSellerAuctionPriceOriginal(e, auctionId);
+	assert e.block.timestamp == getAuctionTimeStart(auctionId) => price == auctionPriceStart(auctionId);
+}
+
+// status: passed
+rule withdrawalIsIrreversible(uint256 contractId, method f) filtered { f -> !f.isFallback } {
+	uint8 pre =	isContractWithdrawn(contractId);
 
 	env e;
 	calldataarg arg;
 	f(e, arg);
 
-	uint post = auctionPrice(auctionId);
+	uint8 post = isContractWithdrawn(contractId);
 
-	assert post <= pre;
-	assert pre != 0 => post != 0;
+	assert pre == TRUE() => post == TRUE(), "once a contract is withdrawn this cannot be changed";
 }
-/*
-rule sellerAuctionPriceStartsAtPriceStart {
 
-}*/
+// status: running, currently without the requireinvariant
+rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method f) {
+	requireInvariant eitherPendingPriceOrEndPriceAreZero(auctionId);
+
+	uint campaignId = getAuctionBuyerCampaign(auctionId);
+	address buyer = getBuyer(campaignId);
+
+	uint _buyerBalance = token.balanceOf(buyer);
+	uint _marketBalance = token.balanceOf(currentContract);
+
+	mathint _price = getAuctionPricePending(auctionId) + getAuctionPriceEnd(auctionId);
+
+	env e;
+	calldataarg arg;
+	f(e, arg);
+
+	uint buyerBalance_ = token.balanceOf(buyer);
+	uint marketBalance_ = token.balanceOf(currentContract);
+
+	mathint price_ = getAuctionPricePending(auctionId) + getAuctionPriceEnd(auctionId);
+
+	assert _price - price_ == _buyerBalance - buyerBalance_, "delta in buyer balance same as delta in price";
+	assert _price - price_ == _marketBalance - marketBalance_, "delta in market balance same as delta in price";
+}
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Helper Functions                                 //
 ////////////////////////////////////////////////////////////////////////////
     
 
-function additivity(uint x, uint y, address who, uint32 funcId) {
+function additivity(uint x, uint y, address who, uint when, uint32 funcId) {
 	storage init = lastStorage;
 
-	callFunctionWithAmountAndSender(funcId, [x], who);
-	callFunctionWithAmountAndSender(funcId, [y], who);
+	callFunctionWithAmountAndSender(funcId, [x], who, when);
+	callFunctionWithAmountAndSender(funcId, [y], who, when);
 
 	uint splitWho = token.balanceOf(who);
 	uint splitMarket = token.balanceOf(currentContract);
-assert false;
-	dummy() at init; // reset the storage
-	callFunctionWithAmountAndSender(funcId, [x,y], who);
 
+	dummy() at init; // reset the storage
+	callFunctionWithAmountAndSender(funcId, [x,y], who, when);
+assert false;
 	uint unifiedWho = token.balanceOf(who);
 	uint unifiedMarket = token.balanceOf(currentContract);
 
@@ -411,28 +557,33 @@ assert false;
 	assert splitMarket == unifiedMarket, "operation is not additive for the market balance";
 }
 
-function callFunctionWithAmountAndSender(uint32 funcId, uint[] array, address who) {
+function callFunctionWithAmountAndSender(uint32 funcId, uint[] array, address who, uint when) {
 	if (funcId == sellerAuctionBidBatch(uint256[],uint256).selector) {
 		env e;
 		require e.msg.sender == who;
+		require e.block.timestamp == when;
 		uint campaignId;
 		validStateBuyer(campaignId);
 		sellerAuctionBidBatch(e, array, campaignId);
 	} else if (funcId == sellerAuctionApproveBatch(uint256[]).selector) {
 		env e;
 		require e.msg.sender == who;
+		require e.block.timestamp == when;
 		sellerAuctionApproveBatch(e, array);
 	} else if (funcId == sellerAuctionBidCancelBatch(uint256[]).selector) {
 		env e;
 		require e.msg.sender == who;
+		require e.block.timestamp == when;
 		sellerAuctionBidCancelBatch(e, array);
 	} else if (funcId == sellerAuctionRejectBatch(uint256[]).selector) {
 		env e;
 		require e.msg.sender == who;
+		require e.block.timestamp == when;
 		sellerAuctionRejectBatch(e, array);
 	} else if (funcId == contractWithdrawBatch(uint256[]).selector) {
 		env e;
 		require e.msg.sender == who;
+		require e.block.timestamp == when;
 		contractWithdrawBatch(e, array);
 	} else {
 		require false;
