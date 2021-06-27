@@ -31,9 +31,6 @@ methods {
 	// nft
 	nft.ownerOf(uint256) returns address envfree
 
-	// summarize
-	getSellerAuctionPrice(uint256 id) => auctionPrice(id)
-
 	// dispatcher
 	onERC721Received(address,address,uint256,bytes) => DISPATCHER(true)
 }
@@ -61,9 +58,6 @@ hook Sstore _buyerCampaigns[KEY uint256 id].(offset 0) address buyer STORAGE {
 	havoc campaignToBuyer assuming campaignToBuyer@new(id) == buyer &&
 		(forall uint256 id2. id != id2 => campaignToBuyer@new(id2) == campaignToBuyer@old(id2));
 }
-
-/////// auction price ghost - completely uninterpreted
-ghost auctionPrice(uint256) returns uint256;
 
 /////// auction price start ghost
 ghost auctionPriceStart(uint256) returns uint256;
@@ -300,7 +294,7 @@ function validStateBuyer(uint campaignId) {
 //                       Rules                                            //
 ////////////////////////////////////////////////////////////////////////////
 
-// Status: sanity issue
+// Status: passing
 rule bidAdditivity(uint x, uint y, address who) {
 	validStateAuction(x);
 	validStateAuction(y);
@@ -310,48 +304,40 @@ rule bidAdditivity(uint x, uint y, address who) {
 	assert true;
 }
 
-// Status: Passing including Sanity
+// Status: Sanity issue
 rule auctionApproveAdditivity(uint x, uint y, address who) {
 	validStateAuction(x);
 	validStateAuction(y);
-	uint256 campaignId = uint256oracle();
-	validStateBuyer(campaignId);
 	additivity(x, y, who, sellerAuctionApproveBatch(uint256[]).selector);
 	assert true;
 }
 
-// Status: sanity issue
+// Status: passed
 rule auctionBidCancelAdditivity(uint x, uint y, address who) {
 	validStateAuction(x);
 	validStateAuction(y);
-	uint256 campaignId = uint256oracle();
-	validStateBuyer(campaignId);
 	additivity(x, y, who, sellerAuctionBidCancelBatch(uint256[]).selector);
 	assert true;
 }
 
-// Status: sanity issue
+// Status: passed
 rule auctionRejectBatchAdditivity(uint x, uint y, address who) {
 	validStateAuction(x);
 	validStateAuction(y);
-	uint256 campaignId = uint256oracle();
-	validStateBuyer(campaignId);
 	additivity(x, y, who, sellerAuctionRejectBatch(uint256[]).selector);
 	assert true;
 }
 
-// Status: Passing including Sanity
+// Status: Sanity issues
 rule contractWithdrawBatchAdditivity(uint x, uint y, address who) {
-	validStateAuction(x);
-	validStateAuction(y);
-	uint256 campaignId = uint256oracle();
-	validStateBuyer(campaignId);
+	//validStateAuction(x);
+	//validStateAuction(y);
 	additivity(x, y, who, contractWithdrawBatch(uint256[]).selector);
 	assert true;
 }
 
-// Status: passing including sanity
-rule buyerCampaignCountMonotonicallyIncreasing(method f) {
+// Status: passing including sanity (not including fallback, so we ignore it)
+rule buyerCampaignCountMonotonicallyIncreasing(method f) filtered { f -> !f.isFallback } {
 	uint pre = buyerCampaignCount();
 
 	env e;
@@ -367,7 +353,7 @@ rule buyerCampaignCountMonotonicallyIncreasing(method f) {
 
 invariant buyerCampaignCountIsGtZero() buyerCampaignCount() > 0
 
-rule sellerAuctionCountMonotonicallyIncreasing(method f) {
+rule sellerAuctionCountMonotonicallyIncreasing(method f) filtered { f -> !f.isFallback } {
 	uint pre = sellerAuctionCount();
 
 	env e;
@@ -384,7 +370,7 @@ rule sellerAuctionCountMonotonicallyIncreasing(method f) {
 invariant sellerAuctionCountIsGtZero() sellerAuctionCount() > 0
 
 // Status: passing including sanity
-rule sellerAuctionPriceMonotonicallyDecreasing(method f, uint auctionId) {
+rule sellerAuctionPriceMonotonicallyDecreasing(method f, uint auctionId) filtered { f -> !f.isFallback } {
 	uint pre = auctionPrice(auctionId);
 
 	env e;
@@ -394,8 +380,12 @@ rule sellerAuctionPriceMonotonicallyDecreasing(method f, uint auctionId) {
 	uint post = auctionPrice(auctionId);
 
 	assert post <= pre;
-	assert pre !=0 => post != 0;
+	assert pre != 0 => post != 0;
 }
+/*
+rule sellerAuctionPriceStartsAtPriceStart {
+
+}*/
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Helper Functions                                 //
@@ -410,7 +400,7 @@ function additivity(uint x, uint y, address who, uint32 funcId) {
 
 	uint splitWho = token.balanceOf(who);
 	uint splitMarket = token.balanceOf(currentContract);
-
+assert false;
 	dummy() at init; // reset the storage
 	callFunctionWithAmountAndSender(funcId, [x,y], who);
 
@@ -425,32 +415,24 @@ function callFunctionWithAmountAndSender(uint32 funcId, uint[] array, address wh
 	if (funcId == sellerAuctionBidBatch(uint256[],uint256).selector) {
 		env e;
 		require e.msg.sender == who;
-		uint campaignId; // = uint256oracle();
+		uint campaignId;
 		validStateBuyer(campaignId);
 		sellerAuctionBidBatch(e, array, campaignId);
 	} else if (funcId == sellerAuctionApproveBatch(uint256[]).selector) {
 		env e;
 		require e.msg.sender == who;
-		uint campaignId; // = uint256oracle();
-		validStateBuyer(campaignId);
 		sellerAuctionApproveBatch(e, array);
 	} else if (funcId == sellerAuctionBidCancelBatch(uint256[]).selector) {
 		env e;
 		require e.msg.sender == who;
-		uint campaignId; // = uint256oracle();
-		validStateBuyer(campaignId);
 		sellerAuctionBidCancelBatch(e, array);
 	} else if (funcId == sellerAuctionRejectBatch(uint256[]).selector) {
 		env e;
 		require e.msg.sender == who;
-		uint campaignId; // = uint256oracle();
-		validStateBuyer(campaignId);
 		sellerAuctionRejectBatch(e, array);
 	} else if (funcId == contractWithdrawBatch(uint256[]).selector) {
 		env e;
 		require e.msg.sender == who;
-		uint campaignId; // = uint256oracle();
-		validStateBuyer(campaignId);
 		contractWithdrawBatch(e, array);
 	} else {
 		require false;
