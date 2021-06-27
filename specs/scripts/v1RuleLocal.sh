@@ -4,4 +4,5 @@ certoraRun.py specs/harness/V1Harness.sol contracts/market/ZestyNFT.sol specs/ha
     --verify V1Harness:specs/market/v1.spec \
     --optimistic_loop --loop_iter 2 \
     --rule $1 \
+    --rule_sanity \
     --cache zesty 

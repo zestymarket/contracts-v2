@@ -322,7 +322,7 @@ invariant aboveBuyerCampaignCountBuyerIsZero(uint256 campaignId)
 // Status: passes - rule #11 in the report
 invariant aboveContractCountContractValueIsZero(uint256 contractId) contractId >= contractCount() => contractToValue(contractId) == 0 && isContractWithdrawn(contractId) == 0
 
-// status: passing, check sanity - rule #12 in the report
+// status: passed - rule #12 in the report
 invariant nftDepositorIsSameAsSellerInNFTSettings(uint256 tokenId) getSellerByTokenId(tokenId) == getDepositor(tokenId)
 
 // if our auction is for a token ID, that token ID must map to the same seller, and in progress count should be greater than 0
@@ -379,8 +379,6 @@ rule bidAdditivity(uint x, uint y, address who) {
 	env eWhen;
 	validStateAuction(x, eWhen);
 	validStateAuction(y, eWhen);
-//	uint256 campaignId = uint256oracle();
-//	validStateBuyer(campaignId);
 	additivity(x, y, who, eWhen.block.timestamp, sellerAuctionBidBatch(uint256[],uint256).selector);
 	assert true;
 }
@@ -436,7 +434,7 @@ rule buyerCampaignCountMonotonicallyIncreasing(method f) filtered { f -> !f.isFa
 	assert pre != 0 => post != 0;
 }
 
-// Status: TODO - rule #16.a in the report
+// Status: passed - rule #16.a in the report
 invariant buyerCampaignCountIsGtZero() buyerCampaignCount() > 0
 
 // status: passing - rule #16.b in the report
@@ -454,10 +452,10 @@ rule sellerAuctionCountMonotonicallyIncreasing(method f) filtered { f -> !f.isFa
 	assert pre != 0 => post != 0;
 }
 
-// Status: TODO - rule #16.b in the report
+// Status: passed - rule #16.b in the report
 invariant sellerAuctionCountIsGtZero() sellerAuctionCount() > 0
 
-// Status: TODO - rule #2.b in the report
+// Status: passed - rule #2.b in the report
 rule sellerAuctionPriceMonotonicallyDecreasing(method f, uint auctionId) filtered { f -> !f.isFallback } {
 	env eGet;
 	uint pre = getSellerAuctionPriceOriginal(eGet, auctionId);
@@ -535,11 +533,11 @@ rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method
 ////////////////////////////////////////////////////////////////////////////
 
 function validStateAuction(uint auctionId, env e) {
-	require auctionPriceStart(auctionId) >= getSellerAuctionPrice(e, auctionId); // TODO: Check in priceShouldAlwaysBeBetweenPriceStartAndPriceEnd
+	require auctionPriceStart(auctionId) >= getSellerAuctionPrice(e, auctionId); // this is checked by monotonicity rule
 } 
 
 function validStateBuyer(uint campaignId) {
-	requireInvariant aboveBuyerCampaignCountBuyerIsZero();
+	requireInvariant aboveBuyerCampaignCountBuyerIsZero(campaignId);
 }   
 
 function additivity(uint x, uint y, address who, uint when, uint32 funcId) {
