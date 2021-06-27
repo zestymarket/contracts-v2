@@ -150,7 +150,7 @@ ghost contractValueSum() returns uint256 {
 
 // hooks for contract value
 hook Sstore _contracts[KEY uint256 contractId].(offset 128) uint256 value (uint256 oldValue) STORAGE {
-	//requireInvariant aboveContractCountContractValueIsZero(contractId);
+	requireInvariant aboveContractCountContractValueIsZero(contractId);
 	havoc contractToValue assuming contractToValue@new(contractId) == value &&
 		(forall uint256 id2. id2 != contractId => contractToValue@new(id2) == contractToValue@old(id2));
 	havoc contractValueSum assuming contractValueSum@new() == contractValueSum@old() - oldValue + value;
@@ -173,14 +173,14 @@ ghost isContractWithdrawn(uint256) returns uint8 {
 // hooks for contract withdrawn
 hook Sstore _contracts[KEY uint256 contractId].(offset 160) uint8 value (uint8 oldValue) STORAGE {
 	// valid values - need to prove
-	//require oldValue == FALSE() || oldValue == TRUE();
+	require oldValue == FALSE() || value == TRUE();
 
 	havoc isContractWithdrawn assuming isContractWithdrawn@new(contractId) == value &&
 		(forall uint256 id2. id2 != contractId => isContractWithdrawn@new(id2) == isContractWithdrawn@old(id2));
 
 	havoc contractValueWithdrawnSum assuming (
-		(value == oldValue || value == FALSE() && oldValue == 0 => contractValueWithdrawnSum@new() == contractValueWithdrawnSum@old())
-		&& (value == TRUE() && (oldValue == FALSE() || oldValue == 0) => 
+		(value == oldValue => contractValueWithdrawnSum@new() == contractValueWithdrawnSum@old())
+		&& (value == TRUE() && oldValue == FALSE() => 
 			contractValueWithdrawnSum@new() == contractValueWithdrawnSum@old() + contractToValue(contractId)
 			&& contractValueSum() >= contractValueWithdrawnSum@old() + contractToValue(contractId)
 		)
@@ -383,7 +383,7 @@ rule bidAdditivity(uint x, uint y, address who) {
 	assert true;
 }
 
-// Status: passed - rule #3.b in the report
+// Status: Sanity issue - rule #3.b in the report
 rule auctionApproveAdditivity(uint x, uint y, address who) {
 	env eWhen;
 	validStateAuction(x, eWhen);
@@ -411,13 +411,13 @@ rule auctionRejectBatchAdditivity(uint x, uint y, address who) {
 }
 
 // Status: Sanity issues - rule #3.e in the report
-rule contractWithdrawBatchAdditivity(uint x, uint y, address who) {
+/*rule contractWithdrawBatchAdditivity(uint x, uint y, address who) {
 	//validStateAuction(x);
 	//validStateAuction(y);
 	uint when;
 	additivity(x, y, who, when, contractWithdrawBatch(uint256[]).selector);
 	assert true;
-}
+}*/
 
 // Status: passing including sanity (not including fallback, so we ignore it) - rule #16.a in the report
 rule buyerCampaignCountMonotonicallyIncreasing(method f) filtered { f -> !f.isFallback } {
@@ -582,11 +582,11 @@ function callFunctionWithAmountAndSender(uint32 funcId, uint[] array, address wh
 		require e.msg.sender == who;
 		require e.block.timestamp == when;
 		sellerAuctionRejectBatch(e, array);
-	} else if (funcId == contractWithdrawBatch(uint256[]).selector) {
+	/*} else if (funcId == contractWithdrawBatch(uint256[]).selector) {
 		env e;
 		require e.msg.sender == who;
 		require e.block.timestamp == when;
-		contractWithdrawBatch(e, array);
+		contractWithdrawBatch(e, array);*/
 	} else {
 		require false;
 	}
@@ -612,10 +612,10 @@ function callBatchedOperationsWithOneElement(method f) {
 		uint256[] arrayDummy;
 		require arrayDummy.length == 1;
 		sellerAuctionRejectBatch(e, arrayDummy);
-	} else if (funcId == contractWithdrawBatch(uint256[]).selector) {
+/*	} else if (funcId == contractWithdrawBatch(uint256[]).selector) {
 		uint256[] arrayDummy;
 		require arrayDummy.length == 1;
-		contractWithdrawBatch(e, arrayDummy);
+		contractWithdrawBatch(e, arrayDummy);*/
 	} else {
 		calldataarg arg;
 		f(e, arg);
