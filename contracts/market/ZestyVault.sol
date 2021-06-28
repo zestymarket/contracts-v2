@@ -3,7 +3,7 @@ pragma solidity ^0.7.6;
 
 import "../utils/Context.sol";
 import "../interfaces/IERC721Receiver.sol";
-import "../interfaces/IERC721.sol";
+import "../interfaces/IZestyNFT.sol";
 
 /**
  * @title ZestyVault for depositing ZestyNFTs
@@ -12,11 +12,11 @@ import "../interfaces/IERC721.sol";
  */
 abstract contract ZestyVault is Context, IERC721Receiver {
     address private _zestyNFTAddress;
-    IERC721 private _zestyNFT;
+    IZestyNFT internal _zestyNFT;
     
     constructor(address zestyNFTAddress_) {
         _zestyNFTAddress = zestyNFTAddress_;
-        _zestyNFT = IERC721(zestyNFTAddress_);
+        _zestyNFT = IZestyNFT(zestyNFTAddress_);
     }
 
     mapping (uint256 => address) private _nftDeposits;

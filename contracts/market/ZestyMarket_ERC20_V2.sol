@@ -17,7 +17,6 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
     address private _rewardsTokenAddress;
     IERC20 private _txToken;
     IERC20 private _rewardsToken;
-    IZestyNFT private _zestyNFT;
     address private _validator;
     uint256 private _buyerCampaignCount = 1; // 0 is used null values
     uint256 private _sellerAuctionCount = 1; // 0 is used for null values
@@ -49,7 +48,6 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
         RewardsRecipient(zestyDAO_, rewardsDistributor_)
     {
         _txTokenAddress = txTokenAddress_;
-        _zestyNFT = IZestyNFT(zestyNFTAddress_);
         _txToken = IERC20(txTokenAddress_);
         _rewardsTokenAddress = rewardsTokenAddress_;
         _rewardsToken = IERC20(rewardsTokenAddress_);
