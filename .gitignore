@@ -8,3 +8,4 @@ artifacts
 # Certora
 /.certora_*
 .last_confs
+.tmp*

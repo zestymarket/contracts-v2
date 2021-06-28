@@ -1,4 +1,4 @@
-certoraRun.py specs/harness/V2Harness.sol contracts/market/ZestyNFT.sol specs/harness/DummyERC20A.sol specs/harness/DummyERC721Receiver.sol \
+certoraRun specs/harness/V2Harness.sol contracts/market/ZestyNFT.sol specs/harness/DummyERC20A.sol specs/harness/DummyERC721Receiver.sol \
     --link V2Harness:_txToken=DummyERC20A \
     --link V2Harness:_zestyNFT=ZestyNFT \
     --verify V2Harness:specs/market/v2.spec \
