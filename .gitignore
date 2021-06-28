@@ -4,3 +4,7 @@ node_modules
 #Hardhat files
 cache
 artifacts
+
+# Certora
+/.certora_*
+.last_confs
