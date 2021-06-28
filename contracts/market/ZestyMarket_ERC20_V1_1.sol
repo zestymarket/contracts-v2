@@ -619,7 +619,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
                 "ZestyMarket_ERC20_V1::contractWithdrawBatch: Not seller or operator"
             );
             require(
-                c.sellerAuctionId != 0 || c.buyerCampaignId != 0,
+                c.sellerAuctionId != 0 && c.buyerCampaignId != 0,
                 "ZestyMarket_ERC20_V1::contractWithdrawBatch: Invalid contract"
             );
             require(
