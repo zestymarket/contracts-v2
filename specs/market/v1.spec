@@ -161,7 +161,7 @@ ghost contractValueSum() returns uint256 {
 }
 
 // hooks for contract value
-hook Sstore _contracts[KEY uint256 contractId].(offset 128) uint256 value (uint256 oldValue) STORAGE {
+hook Sstore _contracts[KEY uint256 contractId].(offset 64) uint256 value (uint256 oldValue) STORAGE {
 	//requireInvariant aboveContractCountContractValueIsZero(contractId); // unsound in case of updates 
 	require contractToValue(contractId) == oldValue;
 	require contractValueSum() >= oldValue;
@@ -175,7 +175,7 @@ hook Sstore _contracts[KEY uint256 contractId].(offset 128) uint256 value (uint2
 		: contractValueWithdrawnSum@old());
 }
 
-hook Sload uint256 value _contracts[KEY uint256 contractId].(offset 128) STORAGE {
+hook Sload uint256 value _contracts[KEY uint256 contractId].(offset 64) STORAGE {
 	require contractToValue(contractId) == value;
 	require contractValueSum() >= value;
 	require (isContractWithdrawn(contractId)==TRUE()) ? contractValueWithdrawnSum() >= value : true;
@@ -187,7 +187,7 @@ ghost isContractWithdrawn(uint256) returns uint8 {
 }
 
 // hooks for contract withdrawn
-hook Sstore _contracts[KEY uint256 contractId].(offset 160) uint8 value (uint8 oldValue) STORAGE {
+hook Sstore _contracts[KEY uint256 contractId].(offset 96) uint8 value (uint8 oldValue) STORAGE {
 	// valid values - need to prove
 	require oldValue == FALSE() || oldValue == TRUE() || oldValue == 0;
 
@@ -209,7 +209,7 @@ hook Sstore _contracts[KEY uint256 contractId].(offset 160) uint8 value (uint8 o
 	);
 }
 
-hook Sload uint8 value _contracts[KEY uint256 contractId].(offset 160) STORAGE {
+hook Sload uint8 value _contracts[KEY uint256 contractId].(offset 96) STORAGE {
 	require isContractWithdrawn(contractId) == value;
 }
 
@@ -254,7 +254,6 @@ invariant sanityContractValueSumGhosts() contractValueSum() >= contractValueWith
 	}
 }
 
-// status: fails on bid reject and cancel - rule #15 in the report
 // update: this is not precise. it doesn't account for non-approved bids.
 /*invariant weakSolvency() token.balanceOf(currentContract) >= contractValueSum() - contractValueWithdrawnSum() {
 	preserved { 
@@ -285,8 +284,8 @@ invariant solvency() token.balanceOf(currentContract) >= endingPricesSum() + pen
 	}
 }
 */
-// as weakSolvency as an invariant requires some new spec features, we will write it as a rule
-// status: passed
+// as solvency as an invariant requires some new spec features, we will write it as a rule
+// status: passed - rule #13 in the report
 rule solvency(method f) filtered { f -> !f.isFallback } {
 	require token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum();
 	solvency_preserve();
@@ -362,7 +361,7 @@ invariant aboveSellerAuctionCountSellerAndPricesAreZero(uint256 auctionId)
 		&& getAuctionPricePending(auctionId) == 0 
 		&& getAuctionPriceEnd(auctionId) == 0
 
-// status: passed - rule #10 in the report
+// status: passed - rule #8 in the report
 invariant aboveBuyerCampaignCountBuyerIsZero(uint256 campaignId) 
 	(campaignId >= buyerCampaignCount() => campaignToBuyer(campaignId) == 0) 
 	&& campaignToBuyer(0) == 0 {
@@ -379,7 +378,7 @@ invariant nftDepositorIsSameAsSellerInNFTSettings(uint256 tokenId) getSellerByTo
 
 // if our auction is for a token ID, that token ID must map to the same seller, and in progress count should be greater than 0
 // the other direction may not be correct since a seller may auction numerous tokens, and the same token for numerous time slots
-// status: passing, check sanity - rule #13 in the report
+// status: passing, check sanity - rule #10 in the report
 invariant sellerNFTSettingsMatchSellerAuction(uint256 tokenId, uint256 auctionId) 
 	auctionSeller(auctionId) != 0 && auctionToTokenId(auctionId) == tokenId =>
 		getSellerByTokenId(tokenId) == auctionSeller(auctionId) {
@@ -421,6 +420,7 @@ invariant times(uint256 auctionId) auctionSeller(auctionId) != 0 => getAuctionTi
 	&& getContractTimeEnd(auctionId) > getAuctionTimeEnd(auctionId)
 	&& getContractTimeStart(auctionId) >= getAuctionTimeStart(auctionId)
 	&& getContractTimeEnd(auctionId) > getContractTimeStart(auctionId)
+
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Rules                                            //
@@ -563,6 +563,7 @@ rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method
 	&& f.selector != contractWithdrawBatch(uint256[]).selector // irrelevant here
 } {
 	requireInvariant eitherPendingPriceOrEndPriceAreZero(auctionId);
+	requireInvariant auctionHasPricePendingOrEndIfAndOnlyIfHasBuyerCampaign(auctionId);
 
 	uint campaignId = getAuctionBuyerCampaign(auctionId);
 	address buyer = getBuyer(campaignId);
@@ -580,7 +581,9 @@ rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method
 
 	mathint price_ = getAuctionPricePending(auctionId) + getAuctionPriceEnd(auctionId);
 
-	assert _price - price_ == _buyerBalance - buyerBalance_, "delta in buyer balance same as delta in price";
+	if (campaignId != 0) {
+		assert _price - price_ == buyerBalance_ - _buyerBalance, "delta in buyer balance same as delta in price";
+	}
 	assert _price - price_ == _marketBalance - marketBalance_, "delta in market balance same as delta in price";
 }
 
