@@ -6,4 +6,4 @@ certoraRun.py specs/harness/V1Harness.sol contracts/market/ZestyNFT.sol specs/ha
     --rule $1 \
     --cache zesty \
     --msg "Market V1 $1 $2" \
-    --staging shelly/preferIteAsExprInHavocAssuming
+    --staging shelly/ghostRevert

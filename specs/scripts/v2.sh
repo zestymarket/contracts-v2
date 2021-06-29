@@ -5,4 +5,4 @@ certoraRun.py specs/harness/V2Harness.sol contracts/market/ZestyNFT.sol specs/ha
     --optimistic_loop --loop_iter 2 \
     --cache zesty \
     --msg "Market V2" \
-    --staging shelly/preferIteAsExprInHavocAssuming 
+    --staging shelly/ghostRevert 

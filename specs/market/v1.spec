@@ -150,7 +150,11 @@ ghost contractValueSum() returns uint256 {
 
 // hooks for contract value
 hook Sstore _contracts[KEY uint256 contractId].(offset 128) uint256 value (uint256 oldValue) STORAGE {
-	//requireInvariant aboveContractCountContractValueIsZero(contractId);
+	//requireInvariant aboveContractCountContractValueIsZero(contractId); // unsound in case of updates 
+	require contractToValue(contractId) == oldValue;
+	require contractValueSum() >= oldValue;
+	require (isContractWithdrawn(contractId)==TRUE()) ? contractValueWithdrawnSum() >= oldValue : true;
+
 	havoc contractToValue assuming contractToValue@new(contractId) == value &&
 		(forall uint256 id2. id2 != contractId => contractToValue@new(id2) == contractToValue@old(id2));
 	havoc contractValueSum assuming contractValueSum@new() == contractValueSum@old() - oldValue + value;
@@ -173,13 +177,15 @@ ghost isContractWithdrawn(uint256) returns uint8 {
 // hooks for contract withdrawn
 hook Sstore _contracts[KEY uint256 contractId].(offset 160) uint8 value (uint8 oldValue) STORAGE {
 	// valid values - need to prove
-	//require oldValue == FALSE() || oldValue == TRUE();
+	require oldValue == FALSE() || oldValue == TRUE() || oldValue == 0;
+
+	require isContractWithdrawn(contractId) == oldValue; // this is important so that constraints we proved about isContractWithdrawn are applied to oldValue
 
 	havoc isContractWithdrawn assuming isContractWithdrawn@new(contractId) == value &&
 		(forall uint256 id2. id2 != contractId => isContractWithdrawn@new(id2) == isContractWithdrawn@old(id2));
 
 	havoc contractValueWithdrawnSum assuming (
-		(value == oldValue || value == FALSE() && oldValue == 0 => contractValueWithdrawnSum@new() == contractValueWithdrawnSum@old())
+		(value == oldValue || (value == FALSE() && oldValue == 0) => contractValueWithdrawnSum@new() == contractValueWithdrawnSum@old())
 		&& (value == TRUE() && (oldValue == FALSE() || oldValue == 0) => 
 			contractValueWithdrawnSum@new() == contractValueWithdrawnSum@old() + contractToValue(contractId)
 			&& contractValueSum() >= contractValueWithdrawnSum@old() + contractToValue(contractId)
@@ -230,10 +236,47 @@ hook Sload uint value _sellerAuctions[KEY uint256 auctionId].(offset 256) STORAG
 ////////////////////////////////////////////////////////////////////////////
 
 // status: passing - used for spec sanity rather than checking the code
-invariant sanityContractValueSumGhosts() contractValueSum() >= contractValueWithdrawnSum()
+invariant sanityContractValueSumGhosts() contractValueSum() >= contractValueWithdrawnSum() {
+	preserved { 
+		// should suffice because we unroll twice in current config
+		requireInvariant aboveContractCountContractValueIsZero(contractCount());
+		require contractCount() < max_uint256-1;
+		uint next = contractCount()+1;
+		requireInvariant aboveContractCountContractValueIsZero(next);
+	}
+}
 
+function solvency_preserve() {
+	// should suffice because we unroll twice in current config
+	requireInvariant aboveContractCountContractValueIsZero(contractCount());
+	require contractCount() < max_uint256-1;
+	uint next = contractCount()+1;
+	requireInvariant aboveContractCountContractValueIsZero(next);
+}
 // status: fails on bid reject and cancel - rule #15 in the report
-invariant solvency() token.balanceOf(currentContract) >= contractValueSum() - contractValueWithdrawnSum()
+// update: this is not precise. it doesn't account for non-approved bids.
+invariant solvency() token.balanceOf(currentContract) >= contractValueSum() - contractValueWithdrawnSum() {
+	preserved { 
+		solvency_preserve();
+	}
+
+	preserved sellerAuctionApproveBatch(uint256[] a) with (env e) {
+		solvency_preserve();
+		if (a.length >= 1) {
+			uint256 a0 = a[0];
+			require getBuyer(getAuctionBuyerCampaign(a0)) != currentContract; // market must not be buyer
+			requireInvariant eitherPendingPriceOrEndPriceAreZero(a0);
+		}
+
+		if (a.length >= 2) {
+			uint256 a1 = a[1];
+			require getBuyer(getAuctionBuyerCampaign(a1)) != currentContract; // market must not be buyer
+			requireInvariant eitherPendingPriceOrEndPriceAreZero(a1);
+		}
+	}
+}
+
+// bring weakSolvency as an invariant back - should be possible now
 /*
 invariant weakSolvency() token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum() {
 	preserved sellerAuctionBidBatch(uint256[] dummy, uint256 campaignId) with (env e) {
@@ -245,7 +288,8 @@ invariant weakSolvency() token.balanceOf(currentContract) >= endingPricesSum() +
 // status: passed, but this is the wrong rule - there is double counting in contracts that must be addressed
 rule weakSolvency(method f) filtered { f -> !f.isFallback } {
 	require token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum();
-
+	solvency_preserve();
+	
 	env e;
 	calldataarg arg;
 	if (f.selector == sellerAuctionBidBatch(uint256[],uint256).selector) {
