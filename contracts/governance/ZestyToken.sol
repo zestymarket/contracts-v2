@@ -60,7 +60,7 @@ contract ZestyToken {
     event Approval(address indexed owner, address indexed spender, uint256 amount);
 
     /**
-     * @notice Construct a new Jseam token
+     * @notice Construct a new Zesty token
      * @param account The initial account to grant all the tokens
      */
     constructor(address account) {

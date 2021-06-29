@@ -17,7 +17,6 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
     address private _rewardsTokenAddress;
     IERC20 private _txToken;
     IERC20 private _rewardsToken;
-    IZestyNFT private _zestyNFT;
     address private _validator;
     uint256 private _buyerCampaignCount = 1; // 0 is used null values
     uint256 private _sellerAuctionCount = 1; // 0 is used for null values
@@ -25,7 +24,6 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
     uint8 private constant _FALSE = 1;
     uint8 private constant _TRUE = 2;
     uint256 private _gracePeriod = 172800; // 2 day grace period for seller to withdraw funds
-    uint32 private _minAvailabilityThreshold = 7500; // min 75% availablility guaranteed
     uint32 private _validatorCut = 300; // 3% cut for validators
     uint32 private _zestyCut = 300; // 3% cut for zesty dao
     uint256 private _rewardsBalance;
@@ -50,7 +48,6 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
         RewardsRecipient(zestyDAO_, rewardsDistributor_)
     {
         _txTokenAddress = txTokenAddress_;
-        _zestyNFT = IZestyNFT(zestyNFTAddress_);
         _txToken = IERC20(txTokenAddress_);
         _rewardsTokenAddress = rewardsTokenAddress_;
         _rewardsToken = IERC20(rewardsTokenAddress_);
@@ -125,8 +122,6 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
     struct Contract {
         uint256 sellerAuctionId;
         uint256 buyerCampaignId;
-        uint256 contractTimeStart;
-        uint256 contractTimeEnd;
         uint256 contractValue;
         uint8 withdrawn;
         uint8 refunded;
@@ -282,8 +277,8 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
     {
         sellerAuctionId = _contracts[_contractId].sellerAuctionId;
         buyerCampaignId = _contracts[_contractId].buyerCampaignId;
-        contractTimeStart = _contracts[_contractId].contractTimeStart;
-        contractTimeEnd = _contracts[_contractId].contractTimeEnd;
+        contractTimeStart = _sellerAuctions[sellerAuctionId].contractTimeStart;
+        contractTimeEnd = _sellerAuctions[sellerAuctionId].contractTimeEnd;
         contractValue = _contracts[_contractId].contractValue;
         withdrawn = _contracts[_contractId].withdrawn;
         refunded = _contracts[_contractId].refunded;
@@ -301,10 +296,6 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
     function setCuts(uint32 validatorCut_, uint32 zestyCut_) external onlyOwner {
         _validatorCut = validatorCut_;
         _zestyCut = zestyCut_;
-    }
-
-    function setMinAvailiblityThreshold(uint32 minAvailabilityThreshold_) external onlyOwner {
-        _minAvailabilityThreshold = minAvailabilityThreshold_;
     }
 
     function setRewardsRate(
@@ -447,6 +438,10 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
                 _contractTimeEnd[i] > _auctionTimeEnd[i],
                 "ZestyMarket_ERC20_V2::sellerAuctionCreateBatch: Ending time of the Contract must be greater than the ending time of Auction"
             );
+            require(
+                _contractTimeEnd[i] > _contractTimeStart[i],
+                "ZestyMarket_ERC20_V1::sellerAuctionCreateBatch: Ending time of the Contract must be greater than the starting time of Contract"
+            );
 
             SellerNFTSetting storage s = _sellerNFTSettings[_tokenId];
             s.inProgressCount = s.inProgressCount.add(1);
@@ -571,11 +566,12 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
 
             // if auto approve is set to true
             if (s.buyerCampaignApproved == _TRUE) {
+                s.pricePending = 0;
+                s.priceEnd = price;
+
                 Contract storage c = _contracts[_contractCount];
                 c.sellerAuctionId = _sellerAuctionId[i];
                 c.buyerCampaignId = _buyerCampaignId;
-                c.contractTimeStart = s.contractTimeStart;
-                c.contractTimeEnd = s.contractTimeEnd;
                 c.contractValue = price;
                 c.refunded = _FALSE;
                 c.withdrawn = _FALSE;
@@ -661,8 +657,6 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
             Contract storage c = _contracts[_contractCount];
             c.sellerAuctionId = _sellerAuctionId[i];
             c.buyerCampaignId = s.buyerCampaign;
-            c.contractTimeStart = s.contractTimeStart;
-            c.contractTimeEnd = s.contractTimeEnd;
             c.contractValue = s.priceEnd;
             c.withdrawn = _FALSE;
             c.refunded = _FALSE;
@@ -801,11 +795,11 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
                 "ZestyMarket_ERC20_V2::contractWithdrawBatch: Not seller or operator"
             );
             require(
-                c.sellerAuctionId != 0 || c.buyerCampaignId != 0,
+                c.sellerAuctionId != 0 && c.buyerCampaignId != 0,
                 "ZestyMarket_ERC20_V2::contractWithdrawBatch: Invalid contract"
             );
             require(
-                block.timestamp > c.contractTimeEnd, 
+                block.timestamp > s.contractTimeEnd, 
                 "ZestyMarket_ERC20_V2::contractWithdrawBatch: Contract has not ended"
             );
             require(
@@ -898,7 +892,7 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
                 "ZestyMarket_ERC20_V2::contractRefundBatch: Invalid contract"
             );
             require(
-                block.timestamp > c.contractTimeEnd + _gracePeriod, 
+                block.timestamp > s.contractTimeEnd + _gracePeriod, 
                 "ZestyMarket_ERC20_V2::contractRefundBatch: Contract has not ended"
             );
             require(

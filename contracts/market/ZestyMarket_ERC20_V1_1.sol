@@ -93,8 +93,6 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
     struct Contract {
         uint256 sellerAuctionId;
         uint256 buyerCampaignId;
-        uint256 contractTimeStart;
-        uint256 contractTimeEnd;
         uint256 contractValue;
         uint8 withdrawn;
     }
@@ -197,8 +195,8 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
     {
         sellerAuctionId = _contracts[_contractId].sellerAuctionId;
         buyerCampaignId = _contracts[_contractId].buyerCampaignId;
-        contractTimeStart = _contracts[_contractId].contractTimeStart;
-        contractTimeEnd = _contracts[_contractId].contractTimeEnd;
+        contractTimeStart = _sellerAuctions[sellerAuctionId].contractTimeStart;
+        contractTimeEnd = _sellerAuctions[sellerAuctionId].contractTimeEnd;
         contractValue = _contracts[_contractId].contractValue;
         withdrawn = _contracts[_contractId].withdrawn;
     }
@@ -338,6 +336,10 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
                 _contractTimeEnd[i] > _auctionTimeEnd[i],
                 "ZestyMarket_ERC20_V1::sellerAuctionCreateBatch: Ending time of the Contract must be greater than the ending time of Auction"
             );
+            require(
+                _contractTimeEnd[i] > _contractTimeStart[i],
+                "ZestyMarket_ERC20_V1::sellerAuctionCreateBatch: Ending time of the Contract must be greater than the starting time of Contract"
+            );
 
             SellerNFTSetting storage s = _sellerNFTSettings[_tokenId];
             s.inProgressCount = s.inProgressCount.add(1);
@@ -466,11 +468,11 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
 
             // if auto approve is set to true
             if (s.buyerCampaignApproved == _TRUE) {
+                s.pricePending = 0;
+                s.priceEnd = price;
                 _contracts[_contractCount] = Contract(
                     _sellerAuctionId[i],
                     _buyerCampaignId,
-                    s.contractTimeStart,
-                    s.contractTimeEnd,
                     price,
                     _FALSE
                 );
@@ -556,8 +558,6 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
             _contracts[_contractCount] = Contract(
                 _sellerAuctionId[i],
                 s.buyerCampaign,
-                s.contractTimeStart,
-                s.contractTimeEnd,
                 s.priceEnd,
                 _FALSE
             );
@@ -619,11 +619,11 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
                 "ZestyMarket_ERC20_V1::contractWithdrawBatch: Not seller or operator"
             );
             require(
-                c.sellerAuctionId != 0 || c.buyerCampaignId != 0,
+                c.sellerAuctionId != 0 && c.buyerCampaignId != 0,
                 "ZestyMarket_ERC20_V1::contractWithdrawBatch: Invalid contract"
             );
             require(
-                block.timestamp > c.contractTimeEnd, 
+                block.timestamp > s.contractTimeEnd, 
                 "ZestyMarket_ERC20_V1::contractWithdrawBatch: Contract has not ended"
             );
             require(
