@@ -11,6 +11,7 @@ using ZestyNFT as nft
 methods {
 	getDepositor(uint256) returns (address) envfree
 	getOperator(address) returns (address) envfree
+	getTxTokenAddress() returns (address) envfree
 
 	// harness
     getAuctionPricePending(uint256) returns uint256 envfree
@@ -49,6 +50,17 @@ definition FALSE() returns uint8 = 1;
 ////////////////////////////////////////////////////////////////////////////
 //                       Ghost                                            //
 ////////////////////////////////////////////////////////////////////////////
+
+/////// reentrancy guard ghost
+ghost reentrancyGuard() returns uint256;
+
+hook Sstore _status uint v STORAGE {
+	havoc reentrancyGuard assuming reentrancyGuard@new() == v;
+}
+
+hook Sload uint v _status STORAGE {
+	require reentrancyGuard() == v;
+}
 
 /////// campaign id to buyer address ghost
 ghost campaignToBuyer(uint256) returns address {
@@ -238,24 +250,13 @@ hook Sload uint value _sellerAuctions[KEY uint256 auctionId].(offset 256) STORAG
 // status: passing - used for spec sanity rather than checking the code
 invariant sanityContractValueSumGhosts() contractValueSum() >= contractValueWithdrawnSum() {
 	preserved { 
-		// should suffice because we unroll twice in current config
-		requireInvariant aboveContractCountContractValueIsZero(contractCount());
-		require contractCount() < max_uint256-1;
-		uint next = contractCount()+1;
-		requireInvariant aboveContractCountContractValueIsZero(next);
+		solvency_preserve();
 	}
 }
 
-function solvency_preserve() {
-	// should suffice because we unroll twice in current config
-	requireInvariant aboveContractCountContractValueIsZero(contractCount());
-	require contractCount() < max_uint256-1;
-	uint next = contractCount()+1;
-	requireInvariant aboveContractCountContractValueIsZero(next);
-}
 // status: fails on bid reject and cancel - rule #15 in the report
 // update: this is not precise. it doesn't account for non-approved bids.
-invariant solvency() token.balanceOf(currentContract) >= contractValueSum() - contractValueWithdrawnSum() {
+/*invariant weakSolvency() token.balanceOf(currentContract) >= contractValueSum() - contractValueWithdrawnSum() {
 	preserved { 
 		solvency_preserve();
 	}
@@ -274,19 +275,19 @@ invariant solvency() token.balanceOf(currentContract) >= contractValueSum() - co
 			requireInvariant eitherPendingPriceOrEndPriceAreZero(a1);
 		}
 	}
-}
+}*/
 
 // bring weakSolvency as an invariant back - should be possible now
 /*
-invariant weakSolvency() token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum() {
+invariant solvency() token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum() {
 	preserved sellerAuctionBidBatch(uint256[] dummy, uint256 campaignId) with (env e) {
 		require getBuyer(campaignId) != currentContract; // market must not be the buyer
 	}
 }
 */
 // as weakSolvency as an invariant requires some new spec features, we will write it as a rule
-// status: passed, but this is the wrong rule - there is double counting in contracts that must be addressed
-rule weakSolvency(method f) filtered { f -> !f.isFallback } {
+// status: passed
+rule solvency(method f) filtered { f -> !f.isFallback } {
 	require token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum();
 	solvency_preserve();
 	
@@ -344,7 +345,9 @@ invariant auctionHasPricePendingOrEndIfAndOnlyIfHasBuyerCampaign(uint256 auction
 	}
 
 // status: fails in withdraw because of NFT index collision
-invariant depositedNFTsBelongToMarket(uint256 tokenId) getSellerByTokenId(tokenId) != 0 => nft.ownerOf(tokenId) == currentContract
+/*invariant depositedNFTsBelongToMarket(uint256 tokenId) 
+	getSellerByTokenId(tokenId) != 0 => nft.ownerOf(tokenId) == currentContract
+*/
 
 // status: passed, including sanity - rule #9 in the report
 invariant aboveSellerAuctionCountSellerAndPricesAreZero(uint256 auctionId) 
@@ -454,10 +457,8 @@ rule auctionRejectBatchAdditivity(uint x, uint y, address who) {
 	assert true;
 }
 
-// Status: Sanity issues - rule #3.e in the report
+// Status: passed - rule #3.e in the report
 rule contractWithdrawBatchAdditivity(uint x, uint y, address who) {
-	//validStateAuction(x);
-	//validStateAuction(y);
 	uint when;
 	additivity(x, y, who, when, contractWithdrawBatch(uint256[]).selector);
 	assert true;
@@ -536,6 +537,9 @@ rule sellerAuctionPriceStartsAtPriceStart(uint auctionId) {
 
 // status: passed - rule #14 in the report
 rule withdrawalIsIrreversible(uint256 contractId, method f) filtered { f -> !f.isFallback } {
+
+	requireInvariant aboveContractCountContractValueIsZero(contractId);
+
 	uint8 pre =	isContractWithdrawn(contractId);
 
 	env e;
@@ -572,6 +576,42 @@ rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method
 	assert _price - price_ == _marketBalance - marketBalance_, "delta in market balance same as delta in price";
 }
 
+
+// status: fails on non agreeing addresses for the token
+rule buyerCanWithdraw(uint256 auctionId) {
+	env e;
+	require e.msg.value == 0;
+	require e.block.timestamp >= getAuctionTimeEnd(auctionId);
+	require getAuctionCampaignApproved(auctionId) == FALSE();
+	address buyer = getBuyer(getAuctionBuyerCampaign(auctionId));
+	require buyer == e.msg.sender;
+	uint deposit = getAuctionPricePending(auctionId);
+	require auctionSeller(auctionId) != 0 && auctionSeller(auctionId) < max_uint160;
+	require reentrancyGuard() != TRUE();
+	require getTxTokenAddress() == token;
+
+	uint oldBuyerBalance = token.balanceOf(buyer);
+
+	sellerAuctionBidCancelBatch@withrevert(e, [auctionId]);
+	bool success = !lastReverted;
+
+	uint newBuyerBalance = token.balanceOf(buyer);
+
+	assert success, "bid cancel failed";
+	assert newBuyerBalance == oldBuyerBalance + deposit, "balance of buyer not updated correctly";
+}
+
+// status: identify the functions that do not call external code
+rule willFailWithReentrancyGuardEnabled(method f) {
+	bool guardUp = reentrancyGuard() == TRUE();
+	env e;
+	calldataarg arg;
+	f@withrevert(e, arg);
+	bool success = !lastReverted;
+
+	assert guardUp => !success || f.isView, "non view function succeeded despite reentrancy guard being up";
+}
+
 ////////////////////////////////////////////////////////////////////////////
 //                       Helper Functions                                 //
 ////////////////////////////////////////////////////////////////////////////
@@ -583,6 +623,14 @@ function validStateAuction(uint auctionId, env e) {
 function validStateBuyer(uint campaignId) {
 	requireInvariant aboveBuyerCampaignCountBuyerIsZero(campaignId);
 }   
+
+function solvency_preserve() {
+	// should suffice because we unroll twice in current config
+	requireInvariant aboveContractCountContractValueIsZero(contractCount());
+	require contractCount() < max_uint256-1;
+	uint next = contractCount()+1;
+	requireInvariant aboveContractCountContractValueIsZero(next);
+}
 
 function additivity(uint x, uint y, address who, uint when, uint32 funcId) {
 	storage init = lastStorage;
