@@ -7,4 +7,4 @@ certoraRun.py specs/harness/V1Harness.sol contracts/market/ZestyNFT.sol specs/ha
     --rule_sanity \
     --cache zesty \
     --msg "Market V1 $1 $2" \
-    --staging shelly/ghostRevert
+    --staging shelly/robustnessAndCalldatasize
