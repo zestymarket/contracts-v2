@@ -55,6 +55,9 @@ describe('ZestyMarket_ERC20_V1_1', function() {
     expect(data.autoApprove).to.equal(1);
     expect(data.inProgressCount).to.equal(0);
 
+    // cannot double deposit
+    await expect(zestyMarket.sellerNFTDeposit(0, 1)).to.be.reverted;
+
     await expect(zestyMarket.connect(signers[1]).sellerNFTWithdraw(0)).to.be.reverted;
 
     await zestyMarket.sellerNFTWithdraw(0);
@@ -865,7 +868,7 @@ describe('ZestyMarket_ERC20_V1_1', function() {
   it('[batched] It should allow a seller to cancel an auction after creating the auction', async function() {
     // Deposit NFT
     await zestyMarket.sellerNFTDeposit(0, 1);
-
+    
     let atsList = [timeNow + 100, timeNow + 100, timeNow + 100];
     let ateList = [timeNow + 10000, timeNow + 10000, timeNow + 10000];
     let ctsList = [timeNow + 101, timeNow + 101, timeNow + 101];
@@ -896,6 +899,12 @@ describe('ZestyMarket_ERC20_V1_1', function() {
       expect(data.buyerCampaignApproved).to.equal(1);
     }
 
+    data = await zestyMarket.getSellerNFTSetting(0);
+    expect(data.tokenId).to.equal(0);
+    expect(data.seller).to.equal(signers[0].address);
+    expect(data.autoApprove).to.equal(1);
+    expect(data.inProgressCount).to.equal(3);
+
     await time.increase(200);
 
     await zestyMarket.sellerAuctionCancelBatch([1,2,3]);
@@ -924,7 +933,7 @@ describe('ZestyMarket_ERC20_V1_1', function() {
     priceList = [100, 100, 100]
 
     await zestyMarket.sellerAuctionCreateBatch(
-      0,
+      1,
       atsList,
       ateList,
       ctsList,
@@ -935,7 +944,7 @@ describe('ZestyMarket_ERC20_V1_1', function() {
     for (let i=4; i<=6; i++) {
       data = await zestyMarket.getSellerAuction(i);
       expect(data.seller).to.equal(signers[0].address);
-      expect(data.tokenId).to.equal(0);
+      expect(data.tokenId).to.equal(1);
       expect(data.auctionTimeStart).to.equal(timeNow + 500);
       expect(data.auctionTimeEnd).to.equal(timeNow + 10500);
       expect(data.contractTimeStart).to.equal(timeNow + 501);
@@ -947,8 +956,15 @@ describe('ZestyMarket_ERC20_V1_1', function() {
       expect(data.buyerCampaignApproved).to.equal(1);
     }
 
+    data = await zestyMarket.getSellerNFTSetting(1);
+    expect(data.tokenId).to.equal(1);
+    expect(data.seller).to.equal(signers[0].address);
+    expect(data.autoApprove).to.equal(1);
+    expect(data.inProgressCount).to.equal(3);
+
     await time.increase(200);
 
+    console.log("cancel 4,5,6");
     await zestyMarket.sellerAuctionCancelBatch([4,5,6]);
 
     for (let i=4; i<=6; i++) {
