@@ -5,6 +5,7 @@ import "../utils/SafeMath.sol";
 import "../utils/ReentrancyGuard.sol";
 import "../interfaces/IERC20.sol";
 import "./ZestyVault.sol";
+import "hardhat/console.sol";
 
 contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
     using SafeMath for uint256;
@@ -114,7 +115,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
     }
 
     function getSellerNFTSetting(uint256 _tokenId) 
-        external 
+        public 
         view
         returns (
             uint256 tokenId,
@@ -140,7 +141,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
     }
 
     function getSellerAuction(uint256 _sellerAuctionId) 
-        external 
+        public 
         view 
         returns (
             address seller,
@@ -170,7 +171,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
     }
 
     function getBuyerCampaign(uint256 _buyerCampaignId)
-        external
+        public
         view
         returns (
             address buyer,
@@ -182,7 +183,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
     }
 
     function getContract(uint256 _contractId)
-        external
+        public
         view
         returns (
             uint256 sellerAuctionId,
@@ -396,13 +397,15 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
                 s.buyerCampaign == 0,
                 "ZestyMarket_ERC20_V1::sellerAuctionCancelBatch: Reject buyer campaign before cancelling"
             );
-            delete _sellerAuctions[_sellerAuctionId[i]];
 
             SellerNFTSetting storage se = _sellerNFTSettings[s.tokenId];
             se.inProgressCount = se.inProgressCount.sub(1);
+
+            delete _sellerAuctions[_sellerAuctionId[i]];
+
             emit SellerAuctionCancel(_sellerAuctionId[i]);
             emit SellerNFTUpdate(
-                se.tokenId,
+                s.tokenId,
                 se.autoApprove,
                 se.inProgressCount
             );
@@ -619,7 +622,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
                 "ZestyMarket_ERC20_V1::contractWithdrawBatch: Not seller or operator"
             );
             require(
-                c.sellerAuctionId != 0 || c.buyerCampaignId != 0,
+                c.sellerAuctionId != 0 && c.buyerCampaignId != 0,
                 "ZestyMarket_ERC20_V1::contractWithdrawBatch: Invalid contract"
             );
             require(

@@ -498,10 +498,12 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
                 s.buyerCampaign == 0,
                 "ZestyMarket_ERC20_V2::sellerAuctionCancelBatch: Reject buyer campaign before cancelling"
             );
-            delete _sellerAuctions[_sellerAuctionId[i]];
 
             SellerNFTSetting storage se = _sellerNFTSettings[s.tokenId];
             se.inProgressCount = se.inProgressCount.sub(1);
+
+            delete _sellerAuctions[_sellerAuctionId[i]];
+
             emit SellerAuctionCancel(_sellerAuctionId[i]);
             emit SellerNFTUpdate(
                 se.tokenId,
@@ -795,7 +797,7 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
                 "ZestyMarket_ERC20_V2::contractWithdrawBatch: Not seller or operator"
             );
             require(
-                c.sellerAuctionId != 0 || c.buyerCampaignId != 0,
+                c.sellerAuctionId != 0 && c.buyerCampaignId != 0,
                 "ZestyMarket_ERC20_V2::contractWithdrawBatch: Invalid contract"
             );
             require(
