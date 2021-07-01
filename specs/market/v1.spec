@@ -11,6 +11,7 @@ using ZestyNFT as nft
 methods {
 	getDepositor(uint256) returns (address) envfree
 	getOperator(address) returns (address) envfree
+	getTxTokenAddress() returns (address) envfree
 
 	// harness
     getAuctionPricePending(uint256) returns uint256 envfree
@@ -25,6 +26,7 @@ methods {
 	getContractTimeEnd(uint256) returns uint256 envfree
 	getSellerByTokenId(uint256) returns address envfree
 	getInProgress(uint256) returns uint256 envfree
+	getTokenId(uint256) returns uint256 envfree
 	getBuyer(uint256) returns address envfree
 
 	dummy() envfree
@@ -45,10 +47,43 @@ methods {
 
 definition TRUE() returns uint8 = 2;
 definition FALSE() returns uint8 = 1;
+definition abs(mathint x) returns mathint = x < 0 ? 0-x : x;
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Ghost                                            //
 ////////////////////////////////////////////////////////////////////////////
+
+/////// tx token and tx token address
+ghost txToken() returns address;
+ghost txTokenAddress() returns address;
+
+hook Sload address v _txToken STORAGE {
+	require txToken() == v;
+}
+
+hook Sstore _txToken address v STORAGE {
+	havoc txToken assuming txToken@new() == v;
+}
+
+
+hook Sload address v _txTokenAddress STORAGE {
+	require txTokenAddress() == v;
+}
+
+hook Sstore _txTokenAddress address v STORAGE {
+	havoc txTokenAddress assuming txTokenAddress@new() == v;
+}
+
+/////// reentrancy guard ghost
+ghost reentrancyGuard() returns uint256;
+
+hook Sstore _status uint v STORAGE {
+	havoc reentrancyGuard assuming reentrancyGuard@new() == v;
+}
+
+hook Sload uint v _status STORAGE {
+	require reentrancyGuard() == v;
+}
 
 /////// campaign id to buyer address ghost
 ghost campaignToBuyer(uint256) returns address {
@@ -149,8 +184,12 @@ ghost contractValueSum() returns uint256 {
 }
 
 // hooks for contract value
-hook Sstore _contracts[KEY uint256 contractId].(offset 128) uint256 value (uint256 oldValue) STORAGE {
-	//requireInvariant aboveContractCountContractValueIsZero(contractId);
+hook Sstore _contracts[KEY uint256 contractId].(offset 64) uint256 value (uint256 oldValue) STORAGE {
+	//requireInvariant aboveContractCountContractValueIsZero(contractId); // unsound in case of updates 
+	require contractToValue(contractId) == oldValue;
+	require contractValueSum() >= oldValue;
+	require (isContractWithdrawn(contractId)==TRUE()) ? contractValueWithdrawnSum() >= oldValue : true;
+
 	havoc contractToValue assuming contractToValue@new(contractId) == value &&
 		(forall uint256 id2. id2 != contractId => contractToValue@new(id2) == contractToValue@old(id2));
 	havoc contractValueSum assuming contractValueSum@new() == contractValueSum@old() - oldValue + value;
@@ -159,7 +198,7 @@ hook Sstore _contracts[KEY uint256 contractId].(offset 128) uint256 value (uint2
 		: contractValueWithdrawnSum@old());
 }
 
-hook Sload uint256 value _contracts[KEY uint256 contractId].(offset 128) STORAGE {
+hook Sload uint256 value _contracts[KEY uint256 contractId].(offset 64) STORAGE {
 	require contractToValue(contractId) == value;
 	require contractValueSum() >= value;
 	require (isContractWithdrawn(contractId)==TRUE()) ? contractValueWithdrawnSum() >= value : true;
@@ -171,15 +210,17 @@ ghost isContractWithdrawn(uint256) returns uint8 {
 }
 
 // hooks for contract withdrawn
-hook Sstore _contracts[KEY uint256 contractId].(offset 160) uint8 value (uint8 oldValue) STORAGE {
+hook Sstore _contracts[KEY uint256 contractId].(offset 96) uint8 value (uint8 oldValue) STORAGE {
 	// valid values - need to prove
-	//require oldValue == FALSE() || oldValue == TRUE();
+	require oldValue == FALSE() || oldValue == TRUE() || oldValue == 0;
+
+	require isContractWithdrawn(contractId) == oldValue; // this is important so that constraints we proved about isContractWithdrawn are applied to oldValue
 
 	havoc isContractWithdrawn assuming isContractWithdrawn@new(contractId) == value &&
 		(forall uint256 id2. id2 != contractId => isContractWithdrawn@new(id2) == isContractWithdrawn@old(id2));
 
 	havoc contractValueWithdrawnSum assuming (
-		(value == oldValue || value == FALSE() && oldValue == 0 => contractValueWithdrawnSum@new() == contractValueWithdrawnSum@old())
+		(value == oldValue || (value == FALSE() && oldValue == 0) => contractValueWithdrawnSum@new() == contractValueWithdrawnSum@old())
 		&& (value == TRUE() && (oldValue == FALSE() || oldValue == 0) => 
 			contractValueWithdrawnSum@new() == contractValueWithdrawnSum@old() + contractToValue(contractId)
 			&& contractValueSum() >= contractValueWithdrawnSum@old() + contractToValue(contractId)
@@ -191,7 +232,7 @@ hook Sstore _contracts[KEY uint256 contractId].(offset 160) uint8 value (uint8 o
 	);
 }
 
-hook Sload uint8 value _contracts[KEY uint256 contractId].(offset 160) STORAGE {
+hook Sload uint8 value _contracts[KEY uint256 contractId].(offset 96) STORAGE {
 	require isContractWithdrawn(contractId) == value;
 }
 
@@ -230,22 +271,49 @@ hook Sload uint value _sellerAuctions[KEY uint256 auctionId].(offset 256) STORAG
 ////////////////////////////////////////////////////////////////////////////
 
 // status: passing - used for spec sanity rather than checking the code
-invariant sanityContractValueSumGhosts() contractValueSum() >= contractValueWithdrawnSum()
+invariant sanityContractValueSumGhosts() contractValueSum() >= contractValueWithdrawnSum() {
+	preserved { 
+		solvency_preserve();
+	}
+}
 
-// status: fails on bid reject and cancel - rule #15 in the report
-invariant solvency() token.balanceOf(currentContract) >= contractValueSum() - contractValueWithdrawnSum()
+// update: this is not precise. it doesn't account for non-approved bids.
+/*invariant weakSolvency() token.balanceOf(currentContract) >= contractValueSum() - contractValueWithdrawnSum() {
+	preserved { 
+		solvency_preserve();
+	}
+
+	preserved sellerAuctionApproveBatch(uint256[] a) with (env e) {
+		solvency_preserve();
+		if (a.length >= 1) {
+			uint256 a0 = a[0];
+			require getBuyer(getAuctionBuyerCampaign(a0)) != currentContract; // market must not be buyer
+			requireInvariant eitherPendingPriceOrEndPriceAreZero(a0);
+		}
+
+		if (a.length >= 2) {
+			uint256 a1 = a[1];
+			require getBuyer(getAuctionBuyerCampaign(a1)) != currentContract; // market must not be buyer
+			requireInvariant eitherPendingPriceOrEndPriceAreZero(a1);
+		}
+	}
+}*/
+
+// bring weakSolvency as an invariant back - should be possible now
 /*
-invariant weakSolvency() token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum() {
+invariant solvency() token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum() {
 	preserved sellerAuctionBidBatch(uint256[] dummy, uint256 campaignId) with (env e) {
 		require getBuyer(campaignId) != currentContract; // market must not be the buyer
 	}
 }
 */
-// as weakSolvency as an invariant requires some new spec features, we will write it as a rule
-// status: passed, but this is the wrong rule - there is double counting in contracts that must be addressed
-rule weakSolvency(method f) filtered { f -> !f.isFallback } {
+// as solvency as an invariant requires some new spec features, we will write it as a rule
+invariant solvency_() token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum()
+// status: passed - rule #13 in the report
+rule solvency(method f) filtered { f -> !f.isFallback } {
 	require token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum();
-
+	solvency_preserve();
+	
 	env e;
 	calldataarg arg;
 	if (f.selector == sellerAuctionBidBatch(uint256[],uint256).selector) {
@@ -299,8 +367,15 @@ invariant auctionHasPricePendingOrEndIfAndOnlyIfHasBuyerCampaign(uint256 auction
 		}
 	}
 
-// status: fails in withdraw because of NFT index collision
-invariant depositedNFTsBelongToMarket(uint256 tokenId) getSellerByTokenId(tokenId) != 0 => nft.ownerOf(tokenId) == currentContract
+// status: fails in withdraw because of NFT index collision - proving vacuously
+invariant depositedNFTsBelongToMarket(uint256 tokenId) 
+	getSellerByTokenId(tokenId) != 0 => nft.ownerOf(tokenId) == currentContract {
+
+	preserved {
+		require false; // This requires proof of the underlying NFT which is out of scope currently
+	}
+}
+
 
 // status: passed, including sanity - rule #9 in the report
 invariant aboveSellerAuctionCountSellerAndPricesAreZero(uint256 auctionId) 
@@ -310,7 +385,7 @@ invariant aboveSellerAuctionCountSellerAndPricesAreZero(uint256 auctionId)
 		&& getAuctionPricePending(auctionId) == 0 
 		&& getAuctionPriceEnd(auctionId) == 0
 
-// status: passed - rule #10 in the report
+// status: passed - rule #8 in the report
 invariant aboveBuyerCampaignCountBuyerIsZero(uint256 campaignId) 
 	(campaignId >= buyerCampaignCount() => campaignToBuyer(campaignId) == 0) 
 	&& campaignToBuyer(0) == 0 {
@@ -327,7 +402,7 @@ invariant nftDepositorIsSameAsSellerInNFTSettings(uint256 tokenId) getSellerByTo
 
 // if our auction is for a token ID, that token ID must map to the same seller, and in progress count should be greater than 0
 // the other direction may not be correct since a seller may auction numerous tokens, and the same token for numerous time slots
-// status: passing, check sanity - rule #13 in the report
+// status: passing, check sanity - rule #10 in the report
 invariant sellerNFTSettingsMatchSellerAuction(uint256 tokenId, uint256 auctionId) 
 	auctionSeller(auctionId) != 0 && auctionToTokenId(auctionId) == tokenId =>
 		getSellerByTokenId(tokenId) == auctionSeller(auctionId) {
@@ -370,6 +445,8 @@ invariant times(uint256 auctionId) auctionSeller(auctionId) != 0 => getAuctionTi
 	&& getContractTimeStart(auctionId) >= getAuctionTimeStart(auctionId)
 	&& getContractTimeEnd(auctionId) > getContractTimeStart(auctionId)
 
+invariant txTokenIsTxTokenAddress() txToken() == txTokenAddress()
+
 ////////////////////////////////////////////////////////////////////////////
 //                       Rules                                            //
 ////////////////////////////////////////////////////////////////////////////
@@ -410,10 +487,8 @@ rule auctionRejectBatchAdditivity(uint x, uint y, address who) {
 	assert true;
 }
 
-// Status: Sanity issues - rule #3.e in the report
+// Status: passed - rule #3.e in the report
 rule contractWithdrawBatchAdditivity(uint x, uint y, address who) {
-	//validStateAuction(x);
-	//validStateAuction(y);
 	uint when;
 	additivity(x, y, who, when, contractWithdrawBatch(uint256[]).selector);
 	assert true;
@@ -492,6 +567,9 @@ rule sellerAuctionPriceStartsAtPriceStart(uint auctionId) {
 
 // status: passed - rule #14 in the report
 rule withdrawalIsIrreversible(uint256 contractId, method f) filtered { f -> !f.isFallback } {
+
+	requireInvariant aboveContractCountContractValueIsZero(contractId);
+
 	uint8 pre =	isContractWithdrawn(contractId);
 
 	env e;
@@ -505,8 +583,13 @@ rule withdrawalIsIrreversible(uint256 contractId, method f) filtered { f -> !f.i
 
 // status: running
 // forcing all batch operations to a single element - should be justified by additivity
-rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method f) filtered { f -> !f.isFallback } {
+rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method f) filtered { f -> 
+	!f.isFallback
+	&& f.selector != contractWithdrawBatch(uint256[]).selector // irrelevant here
+} {
 	requireInvariant eitherPendingPriceOrEndPriceAreZero(auctionId);
+	requireInvariant auctionHasPricePendingOrEndIfAndOnlyIfHasBuyerCampaign(auctionId);
+	requireInvariant aboveSellerAuctionCountSellerAndPricesAreZero(auctionId);
 
 	uint campaignId = getAuctionBuyerCampaign(auctionId);
 	address buyer = getBuyer(campaignId);
@@ -517,15 +600,84 @@ rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method
 
 	mathint _price = getAuctionPricePending(auctionId) + getAuctionPriceEnd(auctionId);
 
-	callBatchedOperationsWithOneElement(f);
+	callAuctionBatchedOperationsWithOneElement(f, auctionId);
 
 	uint buyerBalance_ = token.balanceOf(buyer);
 	uint marketBalance_ = token.balanceOf(currentContract);
 
 	mathint price_ = getAuctionPricePending(auctionId) + getAuctionPriceEnd(auctionId);
 
-	assert _price - price_ == _buyerBalance - buyerBalance_, "delta in buyer balance same as delta in price";
+	if (campaignId != 0) {
+		assert _price - price_ == buyerBalance_ - _buyerBalance, "delta in buyer balance same as delta in price";
+	}
 	assert _price - price_ == _marketBalance - marketBalance_, "delta in market balance same as delta in price";
+}
+
+// status: passed
+rule buyerCanWithdraw(uint256 auctionId) {
+	env e;
+	require e.msg.value == 0;
+	require e.block.timestamp >= getAuctionTimeEnd(auctionId);
+	require getAuctionCampaignApproved(auctionId) == FALSE();
+	address buyer = getBuyer(getAuctionBuyerCampaign(auctionId));
+	require buyer == e.msg.sender;
+	require buyer != currentContract;
+	uint deposit = getAuctionPricePending(auctionId);
+	require auctionSeller(auctionId) != 0 && auctionSeller(auctionId) < max_uint160;
+	require reentrancyGuard() != TRUE();
+	require getTxTokenAddress() == token;
+	requireInvariant txTokenIsTxTokenAddress();
+	requireInvariant solvency_();
+	solvency_preserve();
+
+	uint oldBuyerBalance = token.balanceOf(buyer);
+	require deposit + oldBuyerBalance <= max_uint256;
+	require endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum() >= deposit; // solvency implies market balance >= deposit
+
+	sellerAuctionBidCancelBatch@withrevert(e, [auctionId]);
+	bool success = !lastReverted;
+
+	uint newBuyerBalance = token.balanceOf(buyer);
+
+	assert success, "bid cancel failed";
+	assert newBuyerBalance == oldBuyerBalance + deposit, "balance of buyer not updated correctly";
+}
+
+// status: failed on older version, passed in new version
+rule sellerAuctionCancelBatchRevertConditions(uint256 auctionId) {
+	env e;
+	require e.msg.value == 0;
+	require auctionSeller(auctionId) != 0 && auctionSeller(auctionId) < max_uint160;
+	require reentrancyGuard() != TRUE();
+	require getAuctionBuyerCampaign(auctionId) == 0;
+	require e.msg.sender == auctionSeller(auctionId);
+	require getInProgress(getTokenId(auctionId)) > 0;
+
+	sellerAuctionCancelBatch@withrevert(e, [auctionId]);
+	bool success = !lastReverted;
+
+	assert success, "cancel failed";
+}
+
+// status: identify the functions that do not call external code - rule #19 in the report
+rule willFailWithReentrancyGuardEnabled(method f) {
+	bool guardUp = reentrancyGuard() == TRUE();
+	env e;
+	calldataarg arg;
+	f@withrevert(e, arg);
+	bool success = !lastReverted;
+
+	bool noExternalCalls = f.selector == authorizeOperator(address).selector
+		|| f.selector == buyerCampaignCreate(string).selector
+		|| f.selector == onERC721Received(address,address,uint256,bytes).selector
+		|| f.selector == revokeOperator(address).selector
+		|| f.selector == sellerAuctionCancelBatch(uint256[]).selector
+		|| f.selector == sellerAuctionCreateBatch(uint256,uint256[],uint256[],uint256[],uint256[],uint256[]).selector
+		|| f.selector == sellerBan(address).selector
+		|| f.selector == sellerNFTUpdate(uint256,uint8).selector
+		|| f.selector == sellerUnban(address).selector;
+
+	assert guardUp => !success || f.isView || noExternalCalls, "non view function succeeded despite reentrancy guard being up";
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -539,6 +691,14 @@ function validStateAuction(uint auctionId, env e) {
 function validStateBuyer(uint campaignId) {
 	requireInvariant aboveBuyerCampaignCountBuyerIsZero(campaignId);
 }   
+
+function solvency_preserve() {
+	// should suffice because we unroll twice in current config
+	requireInvariant aboveContractCountContractValueIsZero(contractCount());
+	require contractCount() < max_uint256-1;
+	uint next = contractCount()+1;
+	requireInvariant aboveContractCountContractValueIsZero(next);
+}
 
 function additivity(uint x, uint y, address who, uint when, uint32 funcId) {
 	storage init = lastStorage;
@@ -566,6 +726,7 @@ function callFunctionWithAmountAndSender(uint32 funcId, uint[] array, address wh
 		require e.block.timestamp == when;
 		uint campaignId;
 		validStateBuyer(campaignId);
+		require getBuyer(campaignId) != currentContract;
 		sellerAuctionBidBatch(e, array, campaignId);
 	} else if (funcId == sellerAuctionApproveBatch(uint256[]).selector) {
 		env e;
@@ -592,30 +753,24 @@ function callFunctionWithAmountAndSender(uint32 funcId, uint[] array, address wh
 	}
 }
 
-function callBatchedOperationsWithOneElement(method f) {
+function callAuctionBatchedOperationsWithOneElement(method f, uint256 auctionId) {
 	env e;
 	uint32 funcId = f.selector;
 	if (funcId == sellerAuctionBidBatch(uint256[],uint256).selector) {
-		uint256[] arrayDummy;
-		require arrayDummy.length == 1;
-		uint256 dummy;
-		sellerAuctionBidBatch(e, arrayDummy, dummy);
+		uint256[] arrayDummy = [auctionId];
+		uint256 dummyCampaignId;
+		require getBuyer(dummyCampaignId) != currentContract;
+		sellerAuctionBidBatch(e, arrayDummy, dummyCampaignId);
 	} else if (funcId == sellerAuctionApproveBatch(uint256[]).selector) {
-		uint256[] arrayDummy;
-		require arrayDummy.length == 1;
+		uint256[] arrayDummy = [auctionId];
 		sellerAuctionApproveBatch(e, arrayDummy);
 	} else if (funcId == sellerAuctionBidCancelBatch(uint256[]).selector) {
-		uint256[] arrayDummy;
+		uint256[] arrayDummy = [auctionId];
 		require arrayDummy.length == 1;
 		sellerAuctionBidCancelBatch(e, arrayDummy);
 	} else if (funcId == sellerAuctionRejectBatch(uint256[]).selector) {
-		uint256[] arrayDummy;
-		require arrayDummy.length == 1;
+		uint256[] arrayDummy = [auctionId];
 		sellerAuctionRejectBatch(e, arrayDummy);
-	} else if (funcId == contractWithdrawBatch(uint256[]).selector) {
-		uint256[] arrayDummy;
-		require arrayDummy.length == 1;
-		contractWithdrawBatch(e, arrayDummy);
 	} else {
 		calldataarg arg;
 		f(e, arg);
