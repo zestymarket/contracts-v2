@@ -964,7 +964,6 @@ describe('ZestyMarket_ERC20_V1_1', function() {
 
     await time.increase(200);
 
-    console.log("cancel 4,5,6");
     await zestyMarket.sellerAuctionCancelBatch([4,5,6]);
 
     for (let i=4; i<=6; i++) {
