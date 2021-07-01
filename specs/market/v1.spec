@@ -46,10 +46,32 @@ methods {
 
 definition TRUE() returns uint8 = 2;
 definition FALSE() returns uint8 = 1;
+definition abs(mathint x) returns mathint = x < 0 ? 0-x : x;
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Ghost                                            //
 ////////////////////////////////////////////////////////////////////////////
+
+/////// tx token and tx token address
+ghost txToken() returns address;
+ghost txTokenAddress() returns address;
+
+hook Sload address v _txToken STORAGE {
+	require txToken() == v;
+}
+
+hook Sstore _txToken address v STORAGE {
+	havoc txToken assuming txToken@new() == v;
+}
+
+
+hook Sload address v _txTokenAddress STORAGE {
+	require txTokenAddress() == v;
+}
+
+hook Sstore _txTokenAddress address v STORAGE {
+	havoc txTokenAddress assuming txTokenAddress@new() == v;
+}
 
 /////// reentrancy guard ghost
 ghost reentrancyGuard() returns uint256;
@@ -285,6 +307,7 @@ invariant solvency() token.balanceOf(currentContract) >= endingPricesSum() + pen
 }
 */
 // as solvency as an invariant requires some new spec features, we will write it as a rule
+invariant solvency_() token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum()
 // status: passed - rule #13 in the report
 rule solvency(method f) filtered { f -> !f.isFallback } {
 	require token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum();
@@ -421,6 +444,7 @@ invariant times(uint256 auctionId) auctionSeller(auctionId) != 0 => getAuctionTi
 	&& getContractTimeStart(auctionId) >= getAuctionTimeStart(auctionId)
 	&& getContractTimeEnd(auctionId) > getContractTimeStart(auctionId)
 
+invariant txTokenIsTxTokenAddress() txToken() == txTokenAddress()
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Rules                                            //
@@ -564,6 +588,7 @@ rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method
 } {
 	requireInvariant eitherPendingPriceOrEndPriceAreZero(auctionId);
 	requireInvariant auctionHasPricePendingOrEndIfAndOnlyIfHasBuyerCampaign(auctionId);
+	requireInvariant aboveSellerAuctionCountSellerAndPricesAreZero(auctionId);
 
 	uint campaignId = getAuctionBuyerCampaign(auctionId);
 	address buyer = getBuyer(campaignId);
@@ -587,6 +612,18 @@ rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method
 	assert _price - price_ == _marketBalance - marketBalance_, "delta in market balance same as delta in price";
 }
 
+// status: fails for sellerNFTDeposit - realistic in case sender is approved for market, and problematic if current counter is not 0
+rule legalModificationOfInProgressCount(uint256 tokenId, method f) {
+	uint256 pre = getInProgress(tokenId);
+
+	env e;
+	calldataarg arg;
+	f(e, arg);
+
+	uint256 post = getInProgress(tokenId);
+	assert abs(pre-post) <= 2 /* the unroll factor*/;
+}
+
 
 // status: fails on non agreeing addresses for the token
 rule buyerCanWithdraw(uint256 auctionId) {
@@ -596,12 +633,18 @@ rule buyerCanWithdraw(uint256 auctionId) {
 	require getAuctionCampaignApproved(auctionId) == FALSE();
 	address buyer = getBuyer(getAuctionBuyerCampaign(auctionId));
 	require buyer == e.msg.sender;
+	require buyer != currentContract;
 	uint deposit = getAuctionPricePending(auctionId);
 	require auctionSeller(auctionId) != 0 && auctionSeller(auctionId) < max_uint160;
 	require reentrancyGuard() != TRUE();
 	require getTxTokenAddress() == token;
+	requireInvariant txTokenIsTxTokenAddress();
+	requireInvariant solvency_();
+	solvency_preserve();
 
 	uint oldBuyerBalance = token.balanceOf(buyer);
+	require deposit + oldBuyerBalance <= max_uint256;
+	require endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum() >= deposit; // solvency implies market balance >= deposit
 
 	sellerAuctionBidCancelBatch@withrevert(e, [auctionId]);
 	bool success = !lastReverted;
@@ -610,6 +653,20 @@ rule buyerCanWithdraw(uint256 auctionId) {
 
 	assert success, "bid cancel failed";
 	assert newBuyerBalance == oldBuyerBalance + deposit, "balance of buyer not updated correctly";
+}
+
+rule sellerAuctionCancelBatchRevertConditions(uint256 auctionId) {
+	env e;
+	require e.msg.value == 0;
+	require auctionSeller(auctionId) != 0 && auctionSeller(auctionId) < max_uint160;
+	require reentrancyGuard() != TRUE();
+	require getAuctionBuyerCampaign(auctionId) == 0;
+	require e.msg.sender == auctionSeller(auctionId);
+	
+	sellerAuctionCancelBatch@withrevert(e, [auctionId]);
+	bool success = !lastReverted;
+
+	assert success, "cancel failed";
 }
 
 // status: identify the functions that do not call external code - rule #19 in the report
@@ -679,6 +736,7 @@ function callFunctionWithAmountAndSender(uint32 funcId, uint[] array, address wh
 		require e.block.timestamp == when;
 		uint campaignId;
 		validStateBuyer(campaignId);
+		require getBuyer(campaignId) != currentContract;
 		sellerAuctionBidBatch(e, array, campaignId);
 	} else if (funcId == sellerAuctionApproveBatch(uint256[]).selector) {
 		env e;
