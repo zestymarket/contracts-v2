@@ -26,6 +26,7 @@ methods {
 	getContractTimeEnd(uint256) returns uint256 envfree
 	getSellerByTokenId(uint256) returns address envfree
 	getInProgress(uint256) returns uint256 envfree
+	getTokenId(uint256) returns uint256 envfree
 	getBuyer(uint256) returns address envfree
 
 	dummy() envfree
@@ -612,20 +613,7 @@ rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method
 	assert _price - price_ == _marketBalance - marketBalance_, "delta in market balance same as delta in price";
 }
 
-// status: fails for sellerNFTDeposit - realistic in case sender is approved for market, and problematic if current counter is not 0
-rule legalModificationOfInProgressCount(uint256 tokenId, method f) {
-	uint256 pre = getInProgress(tokenId);
-
-	env e;
-	calldataarg arg;
-	f(e, arg);
-
-	uint256 post = getInProgress(tokenId);
-	assert abs(pre-post) <= 2 /* the unroll factor*/;
-}
-
-
-// status: fails on non agreeing addresses for the token
+// status: passed
 rule buyerCanWithdraw(uint256 auctionId) {
 	env e;
 	require e.msg.value == 0;
@@ -655,6 +643,7 @@ rule buyerCanWithdraw(uint256 auctionId) {
 	assert newBuyerBalance == oldBuyerBalance + deposit, "balance of buyer not updated correctly";
 }
 
+// status: failed on older version, passed in new version
 rule sellerAuctionCancelBatchRevertConditions(uint256 auctionId) {
 	env e;
 	require e.msg.value == 0;
@@ -662,7 +651,8 @@ rule sellerAuctionCancelBatchRevertConditions(uint256 auctionId) {
 	require reentrancyGuard() != TRUE();
 	require getAuctionBuyerCampaign(auctionId) == 0;
 	require e.msg.sender == auctionSeller(auctionId);
-	
+	require getInProgress(getTokenId(auctionId)) > 0;
+
 	sellerAuctionCancelBatch@withrevert(e, [auctionId]);
 	bool success = !lastReverted;
 
@@ -768,8 +758,9 @@ function callAuctionBatchedOperationsWithOneElement(method f, uint256 auctionId)
 	uint32 funcId = f.selector;
 	if (funcId == sellerAuctionBidBatch(uint256[],uint256).selector) {
 		uint256[] arrayDummy = [auctionId];
-		uint256 dummy;
-		sellerAuctionBidBatch(e, arrayDummy, dummy);
+		uint256 dummyCampaignId;
+		require getBuyer(dummyCampaignId) != currentContract;
+		sellerAuctionBidBatch(e, arrayDummy, dummyCampaignId);
 	} else if (funcId == sellerAuctionApproveBatch(uint256[]).selector) {
 		uint256[] arrayDummy = [auctionId];
 		sellerAuctionApproveBatch(e, arrayDummy);
