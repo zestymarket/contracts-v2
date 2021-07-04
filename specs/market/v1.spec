@@ -561,6 +561,8 @@ rule withdrawalIsIrreversible(uint256 contractId, method f) filtered { f -> !f.i
 
 // status: passed - rule #21 in the report
 // forcing all batch operations to a single element - should be justified by additivity
+// this is the most expensive rule, so commenting it out
+/*
 rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method f) filtered { f -> 
 	!f.isFallback
 	&& f.selector != contractWithdrawBatch(uint256[]).selector // irrelevant here
@@ -590,7 +592,7 @@ rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method
 	}
 	assert _price - price_ == _marketBalance - marketBalance_, "delta in market balance same as delta in price";
 }
-
+*/
 // status: passed - rule #22 in the report
 rule buyerCanWithdraw(uint256 auctionId) {
 	env e;
