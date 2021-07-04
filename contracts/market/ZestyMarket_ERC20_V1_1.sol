@@ -459,7 +459,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
 
             require(
                 _txToken.transferFrom(b.buyer, address(this), price),
-                "ZestyMarket_ERC20_V1::sellerAuctionBidBatch Transfer of ERC20 failed, check if sufficient allowance is provided"
+                "ZestyMarket_ERC20_V1::sellerAuctionBidBatch: Transfer of ERC20 failed, check if sufficient allowance is provided"
             );
 
             emit SellerAuctionBuyerCampaignNew(
