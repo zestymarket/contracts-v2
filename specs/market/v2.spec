@@ -210,7 +210,8 @@ ghost isContractWithdrawn(uint256) returns uint8 {
 }
 
 // hooks for contract withdrawn
-hook Sstore _contracts[KEY uint256 contractId].(offset 96) uint8 value (uint8 oldValue) STORAGE {
+hook Sstore _contracts[KEY uint256 contractId].(offset 96) uint8 value (uint8 oldValue_) STORAGE {
+	uint8 oldValue = oldValue & 0xff;
 	// valid values - need to prove
 	require oldValue == FALSE() || oldValue == TRUE() || oldValue == 0;
 
@@ -659,15 +660,15 @@ rule willFailWithReentrancyGuardEnabled(method f) {
 		//|| f.selector == sellerBan(address).selector // not in V2
 		|| f.selector == sellerNFTUpdate(uint256,uint8).selector
 		//|| f.selector == sellerUnban(address).selector // not in V2
-		|| setValidator(address).selector
-		|| setRewardsRate(uint256,uint256,uint256,uint256).selector
-		|| contractSetHashlockBatch(uint256[],bytes32[],uint32[]).selector
-		|| notifyRewardAmount(uint256).selector
-		|| renounceOwnership().selector
-		|| contractSetShare(uint256,string).selector
-		|| setCuts(uint32,uint32).selector
-		|| setRewardsDistributor(address).selector
-		|| transferOwnership(address).selector
+		|| f.selector == setValidator(address).selector
+		|| f.selector == setRewardsRate(uint256,uint256,uint256,uint256).selector
+		|| f.selector == contractSetHashlockBatch(uint256[],bytes32[],uint32[]).selector
+		|| f.selector == notifyRewardAmount(uint256).selector
+		|| f.selector == renounceOwnership().selector
+		|| f.selector == contractSetShare(uint256,string).selector
+		|| f.selector == setCuts(uint32,uint32).selector
+		|| f.selector == setRewardsDistributor(address).selector
+		|| f.selector == transferOwnership(address).selector
 		;
 
 	assert guardUp => !success || f.isView || noExternalCalls, "non view function succeeded despite reentrancy guard being up";
