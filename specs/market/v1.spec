@@ -277,40 +277,18 @@ invariant sanityContractValueSumGhosts() contractValueSum() >= contractValueWith
 	}
 }
 
-// update: this is not precise. it doesn't account for non-approved bids.
-/*invariant weakSolvency() token.balanceOf(currentContract) >= contractValueSum() - contractValueWithdrawnSum() {
-	preserved { 
-		solvency_preserve();
-	}
-
-	preserved sellerAuctionApproveBatch(uint256[] a) with (env e) {
-		solvency_preserve();
-		if (a.length >= 1) {
-			uint256 a0 = a[0];
-			require getBuyer(getAuctionBuyerCampaign(a0)) != currentContract; // market must not be buyer
-			requireInvariant eitherPendingPriceOrEndPriceAreZero(a0);
-		}
-
-		if (a.length >= 2) {
-			uint256 a1 = a[1];
-			require getBuyer(getAuctionBuyerCampaign(a1)) != currentContract; // market must not be buyer
-			requireInvariant eitherPendingPriceOrEndPriceAreZero(a1);
-		}
-	}
-}*/
-
-// bring weakSolvency as an invariant back - should be possible now
-/*
+// status: passed - rule #13 in the report
 invariant solvency() token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum() {
-	preserved sellerAuctionBidBatch(uint256[] dummy, uint256 campaignId) with (env e) {
-		require getBuyer(campaignId) != currentContract; // market must not be the buyer
+	preserved {
+		solvency_preserve();
+	}
+
+	preserved sellerAuctionBidBatch(uint256[] auctionIds, uint256 campaignId) with (env e) {
+		solvency_preserve();
+		require getBuyer(campaignId) != currentContract;
 	}
 }
-*/
-// as solvency as an invariant requires some new spec features, we will write it as a rule
-invariant solvency_() token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum()
-// status: passed - rule #13 in the report
-rule solvency(method f) filtered { f -> !f.isFallback } {
+rule solvency_(method f) filtered { f -> !f.isFallback } {
 	require token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum();
 	solvency_preserve();
 	
@@ -328,7 +306,7 @@ rule solvency(method f) filtered { f -> !f.isFallback } {
 	assert token.balanceOf(currentContract) >= endingPricesSum() + pendingPricesSum() - contractValueWithdrawnSum();
 }
 
-// status: passed - rule #6 in the report
+// status: passed - rule #4 in the report
 invariant eitherPendingPriceOrEndPriceAreZero(uint256 auctionId) getAuctionPricePending(auctionId) == 0 || getAuctionPriceEnd(auctionId) == 0 {
 	preserved {
 		requireInvariant aboveSellerAuctionCountSellerAndPricesAreZero(auctionId);
@@ -336,7 +314,7 @@ invariant eitherPendingPriceOrEndPriceAreZero(uint256 auctionId) getAuctionPrice
 	}
 }
 
-// status: passed - rule #7 in the report
+// status: passed - rule #5 in the report
 invariant beforeBidThereIsNoPriceEnd(uint256 auctionId) 
 	getAuctionBuyerCampaign(auctionId) == 0 => 
 		getAuctionPriceEnd(auctionId) == 0 
@@ -350,7 +328,7 @@ invariant beforeBidThereIsNoPriceEnd(uint256 auctionId)
 	}
 }
 
-// status: passed - rule #8 in the report
+// status: passed - rule #6 in the report
 invariant oncePriceEndWasSetPricePendingMustBeZeroAndMustBeApproved(uint256 auctionId) getAuctionPriceEnd(auctionId) != 0 => getAuctionPricePending(auctionId) == 0 && getAuctionCampaignApproved(auctionId) == TRUE() {
 	preserved {
 		requireInvariant beforeBidThereIsNoPriceEnd(auctionId);
@@ -367,7 +345,7 @@ invariant auctionHasPricePendingOrEndIfAndOnlyIfHasBuyerCampaign(uint256 auction
 		}
 	}
 
-// status: fails in withdraw because of NFT index collision - proving vacuously
+// status: fails in withdraw because of NFT index collision - proving vacuously - rule # 19 in the report
 invariant depositedNFTsBelongToMarket(uint256 tokenId) 
 	getSellerByTokenId(tokenId) != 0 => nft.ownerOf(tokenId) == currentContract {
 
@@ -376,8 +354,7 @@ invariant depositedNFTsBelongToMarket(uint256 tokenId)
 	}
 }
 
-
-// status: passed, including sanity - rule #9 in the report
+// status: passed, including sanity - rule #7 in the report
 invariant aboveSellerAuctionCountSellerAndPricesAreZero(uint256 auctionId) 
 	auctionId >= sellerAuctionCount() => 
 		auctionSeller(auctionId) == 0 
@@ -394,15 +371,15 @@ invariant aboveBuyerCampaignCountBuyerIsZero(uint256 campaignId)
 	}
 }
 
-// Status: passes - rule #11 in the report
+// Status: passes - rule #9 in the report
 invariant aboveContractCountContractValueIsZero(uint256 contractId) contractId >= contractCount() => contractToValue(contractId) == 0 && isContractWithdrawn(contractId) == 0
 
-// status: passed - rule #12 in the report
+// status: passed - rule #10 in the report
 invariant nftDepositorIsSameAsSellerInNFTSettings(uint256 tokenId) getSellerByTokenId(tokenId) == getDepositor(tokenId)
 
 // if our auction is for a token ID, that token ID must map to the same seller, and in progress count should be greater than 0
 // the other direction may not be correct since a seller may auction numerous tokens, and the same token for numerous time slots
-// status: passing, check sanity - rule #10 in the report
+// status: passing - rule #11 in the report
 invariant sellerNFTSettingsMatchSellerAuction(uint256 tokenId, uint256 auctionId) 
 	auctionSeller(auctionId) != 0 && auctionToTokenId(auctionId) == tokenId =>
 		getSellerByTokenId(tokenId) == auctionSeller(auctionId) {
@@ -439,12 +416,13 @@ invariant autoApproveValid(uint256 tokenId)
 	}
 }
 
-// status: failing on create - bug found by the team after we asked them - rule #17 in the report
+// status: passed - rule #15 in the report
 invariant times(uint256 auctionId) auctionSeller(auctionId) != 0 => getAuctionTimeEnd(auctionId) > getAuctionTimeStart(auctionId)
 	&& getContractTimeEnd(auctionId) > getAuctionTimeEnd(auctionId)
 	&& getContractTimeStart(auctionId) >= getAuctionTimeStart(auctionId)
 	&& getContractTimeEnd(auctionId) > getContractTimeStart(auctionId)
 
+// status: passed - rule #20 in the report
 invariant txTokenIsTxTokenAddress() txToken() == txTokenAddress()
 
 ////////////////////////////////////////////////////////////////////////////
@@ -494,7 +472,7 @@ rule contractWithdrawBatchAdditivity(uint x, uint y, address who) {
 	assert true;
 }
 
-// Status: passing including sanity (not including fallback, so we ignore it) - rule #16.a in the report
+// Status: passing including sanity (not including fallback, so we ignore it) - rule #14.a in the report
 rule buyerCampaignCountMonotonicallyIncreasing(method f) filtered { f -> !f.isFallback } {
 	uint pre = buyerCampaignCount();
 
@@ -509,10 +487,10 @@ rule buyerCampaignCountMonotonicallyIncreasing(method f) filtered { f -> !f.isFa
 	assert pre != 0 => post != 0;
 }
 
-// Status: passed - rule #16.a in the report
+// Status: passed - rule #14.a in the report
 invariant buyerCampaignCountIsGtZero() buyerCampaignCount() > 0
 
-// status: passing - rule #16.b in the report
+// status: passing - rule #14.b in the report
 rule sellerAuctionCountMonotonicallyIncreasing(method f) filtered { f -> !f.isFallback } {
 	uint pre = sellerAuctionCount();
 
@@ -527,7 +505,7 @@ rule sellerAuctionCountMonotonicallyIncreasing(method f) filtered { f -> !f.isFa
 	assert pre != 0 => post != 0;
 }
 
-// Status: passed - rule #16.b in the report
+// Status: passed - rule #14.b in the report
 invariant sellerAuctionCountIsGtZero() sellerAuctionCount() > 0
 
 // Status: passed - rule #2.b in the report
@@ -565,7 +543,7 @@ rule sellerAuctionPriceStartsAtPriceStart(uint auctionId) {
 	assert e.block.timestamp == getAuctionTimeStart(auctionId) => price == auctionPriceStart(auctionId);
 }
 
-// status: passed - rule #14 in the report
+// status: passed - rule #12 in the report
 rule withdrawalIsIrreversible(uint256 contractId, method f) filtered { f -> !f.isFallback } {
 
 	requireInvariant aboveContractCountContractValueIsZero(contractId);
@@ -581,7 +559,7 @@ rule withdrawalIsIrreversible(uint256 contractId, method f) filtered { f -> !f.i
 	assert pre == TRUE() => post == TRUE(), "once a contract is withdrawn this cannot be changed";
 }
 
-// status: running
+// status: passed - rule #21 in the report
 // forcing all batch operations to a single element - should be justified by additivity
 rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method f) filtered { f -> 
 	!f.isFallback
@@ -613,11 +591,11 @@ rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method
 	assert _price - price_ == _marketBalance - marketBalance_, "delta in market balance same as delta in price";
 }
 
-// status: passed
+// status: passed - rule #22 in the report
 rule buyerCanWithdraw(uint256 auctionId) {
 	env e;
 	require e.msg.value == 0;
-	require e.block.timestamp >= getAuctionTimeEnd(auctionId);
+	//require e.block.timestamp >= getAuctionTimeEnd(auctionId);
 	require getAuctionCampaignApproved(auctionId) == FALSE();
 	address buyer = getBuyer(getAuctionBuyerCampaign(auctionId));
 	require buyer == e.msg.sender;
@@ -627,7 +605,7 @@ rule buyerCanWithdraw(uint256 auctionId) {
 	require reentrancyGuard() != TRUE();
 	require getTxTokenAddress() == token;
 	requireInvariant txTokenIsTxTokenAddress();
-	requireInvariant solvency_();
+	requireInvariant solvency();
 	solvency_preserve();
 
 	uint oldBuyerBalance = token.balanceOf(buyer);
@@ -643,7 +621,7 @@ rule buyerCanWithdraw(uint256 auctionId) {
 	assert newBuyerBalance == oldBuyerBalance + deposit, "balance of buyer not updated correctly";
 }
 
-// status: failed on older version, passed in new version
+// status: failed on older version, passed in new version - rule #23 in the report
 rule sellerAuctionCancelBatchRevertConditions(uint256 auctionId) {
 	env e;
 	require e.msg.value == 0;
@@ -659,7 +637,7 @@ rule sellerAuctionCancelBatchRevertConditions(uint256 auctionId) {
 	assert success, "cancel failed";
 }
 
-// status: identify the functions that do not call external code - rule #19 in the report
+// status: passed - rule #16 in the report
 rule willFailWithReentrancyGuardEnabled(method f) {
 	bool guardUp = reentrancyGuard() == TRUE();
 	env e;
