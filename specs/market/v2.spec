@@ -2,7 +2,7 @@
     This is a specification file for smart contract verification with the Certora prover.
     For more information, visit: https://www.certora.com/
 
-    This file is run with scripts/v1.sh
+    This file is run with scripts/v2.sh
 */
 
 using DummyERC20A as token
