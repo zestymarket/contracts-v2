@@ -78,27 +78,31 @@ ghost tokenToMapIndex(uint) returns uint {
 
 // update a key in the array
 hook Sstore _tokenOwners.(offset 0 /* the array */)[INDEX uint arrayIndex].(offset 0 /* key */) uint newKey (uint oldKey) STORAGE {
-    havoc arrayIndexToToken assuming arrayIndexToToken@new(arrayIndex) == newKey
-        && (forall uint i2. arrayIndexToToken@new(i2) != arrayIndexToToken@old(i2) => arrayIndex == i2);
-    address owner = arrayIndexToOwner(arrayIndex);
+    uint actualIndex = (arrayIndex)/2;
+    havoc arrayIndexToToken assuming arrayIndexToToken@new(actualIndex) == newKey
+        && (forall uint i2. arrayIndexToToken@new(i2) != arrayIndexToToken@old(i2) => actualIndex == i2);
+    address owner = arrayIndexToOwner(actualIndex);
     havoc tokenToOwner assuming tokenToOwner@new(newKey) == owner
         && (forall uint t2. tokenToOwner@new(t2) != tokenToOwner@old(t2) => newKey == t2);
 }
 
 hook Sload uint key _tokenOwners.(offset 0 /* the array */)[INDEX uint arrayIndex].(offset 0 /* key */) STORAGE {
-    require arrayIndexToToken(arrayIndex) == key;
+    uint actualIndex = (arrayIndex)/2;
+    require arrayIndexToToken(actualIndex) == key;
 }
 
 hook Sstore _tokenOwners.(offset 0 /* the array */)[INDEX uint arrayIndex].(offset 32 /* value */) address newValue (address oldValue) STORAGE {
-    havoc arrayIndexToOwner assuming arrayIndexToOwner@new(arrayIndex) == newValue
-        && (forall uint i2. arrayIndexToOwner@new(i2) != arrayIndexToOwner@old(i2) => arrayIndex == i2);
+    uint actualIndex = (arrayIndex - 1)/2;
+    havoc arrayIndexToOwner assuming arrayIndexToOwner@new(actualIndex) == newValue
+        && (forall uint i2. arrayIndexToOwner@new(i2) != arrayIndexToOwner@old(i2) => actualIndex == i2);
     address token = arrayIndexToToken(arrayIndex);
     havoc tokenToOwner assuming tokenToOwner@new(token) == newValue
         && (forall uint t2. tokenToOwner@new(t2) != tokenToOwner@old(t2) => token == t2);
 }
 
 hook Sload uint value _tokenOwners.(offset 0 /* the array */)[INDEX uint arrayIndex].(offset 32 /* value */) STORAGE {
-    require arrayIndexToOwner(arrayIndex) == value;
+    uint actualIndex = (arrayIndex -1)/2;
+    require arrayIndexToOwner(actualIndex) == value;
 }
 
 hook Sstore _tokenOwners.(offset 0 /* the array */) uint newLen (uint oldLen) STORAGE {
@@ -110,18 +114,21 @@ hook Sload uint len _tokenOwners.(offset 0 /* the array */) STORAGE {
 }
 
 hook Sstore _tokenOwners.(offset 32 /* the map */)[KEY uint t] uint newMapIndex (uint oldMapIndex) STORAGE {
-    havoc tokenToMapIndex assuming (newMapIndex > 0 => tokenToMapIndex@new(t) == newMapIndex)  // this is how the internal representation of the map works
-        && (newMapIndex == 0 => tokenToMapIndex@new(t) == 0)
+    havoc tokenToMapIndex assuming tokenToMapIndex@new(t) == newMapIndex
         && (forall uint t2. tokenToMapIndex@new(t2) != tokenToMapIndex@old(t2) => t2 == t);
+    // tokentoowner update?
 }
 
 hook Sload uint index _tokenOwners.(offset 32 /* the map */)[KEY uint t] STORAGE {
-    require index > 0 => tokenToMapIndex(t) == index;
+    require tokenToMapIndex(t) == index;
 }
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Ghost check rules                                //
 ////////////////////////////////////////////////////////////////////////////
+
+invariant tokenMapIndexLessThanOrEqNumTokens(uint t)
+    tokenToMapIndex(t) <= numTokens()
 
 invariant tokenInMapAppearsInListAndViceVersa(uint t)
     t != 0 => (tokenToMapIndex(t) > 0 => arrayIndexToToken(mapIndexToArrayIndex(tokenToMapIndex(t))) == t)
@@ -129,6 +136,9 @@ invariant tokenInMapAppearsInListAndViceVersa(uint t)
     {
         preserved burn(uint256 t2) with (env e) {
             require t2 != 0;
+            require numTokens() < 10000;
+            requireInvariant tokenMapIndexLessThanOrEqNumTokens(t);
+            requireInvariant tokenMapIndexLessThanOrEqNumTokens(t2);
             requireInvariant tokenInMapAppearsInListAndViceVersa(t2);
             requireInvariant uniqueTokensInList(t);
             requireInvariant uniqueTokensInList(numTokens());
