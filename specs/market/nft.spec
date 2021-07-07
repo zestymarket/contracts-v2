@@ -10,6 +10,8 @@ methods {
 
 definition mapIndexToArrayIndex(uint mapIndex) returns uint = mapIndex - 1;
 definition arrayIndexToMapIndex(uint arrayIndex) returns uint = arrayIndex + 1;
+definition isListedKey(uint k, uint i) returns bool = 0 <= i && i < numTokens() && arrayIndexToToken(i) == k;
+definition isListedValue(uint v, uint i) returns bool = 0 <= i && i < numTokens() && arrayIndexToOwner(i) == v;
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Ghosts                                           //
@@ -127,6 +129,7 @@ hook Sload uint index _tokenOwners.(offset 32 /* the map */)[KEY uint t] STORAGE
 //                       Ghost check rules                                //
 ////////////////////////////////////////////////////////////////////////////
 
+// status: passed
 invariant tokenMapIndexLessThanOrEqNumTokens(uint t)
     t != 0 => tokenToMapIndex(t) <= numTokens() {
         preserved {
@@ -140,18 +143,18 @@ invariant tokenMapIndexLessThanOrEqNumTokens(uint t)
         }
     }
 
+// status: passed
 invariant tokenInMapAppearsInListAndViceVersa(uint t)
     t != 0 => (tokenToMapIndex(t) > 0 => arrayIndexToToken(mapIndexToArrayIndex(tokenToMapIndex(t))) == t)
-    && (tokenToMapIndex(t) == 0 => (forall uint j. /*j > 0 => */arrayIndexToToken(j) != t)) 
+    && (tokenToMapIndex(t) == 0 => (forall uint j. arrayIndexToToken(j) != t)) 
     {
         preserved burn(uint256 t2) with (env e) {
             require t2 != 0;
-            require numTokens() < 10000;
+            require numTokens() < max_uint256/2; // avoid overflows
             requireInvariant tokenMapIndexLessThanOrEqNumTokens(t);
             requireInvariant tokenMapIndexLessThanOrEqNumTokens(t2);
             requireInvariant tokenInMapAppearsInListAndViceVersa(t2);
             requireInvariant uniqueTokensInList(t);
-            requireInvariant uniqueTokensInList(numTokens());
             requireInvariant uniqueTokensInList(t2);
         }
 
@@ -162,36 +165,22 @@ invariant tokenInMapAppearsInListAndViceVersa(uint t)
         }
     }
 
-/*
-rule sanityTokenInMapAppearsInListAndViceVersa(uint t) {
-    uint tti = tokenToMapIndex(t);
-    uint itk = arrayIndexToToken(tti-1);
-
-    require tti > 0 => itk == t;
-    require tti == 0 => (forall uint j. j > 0 => arrayIndexToToken(j) != t);
-
-    env e;
-    calldataarg arg;
-    method f;
-    f(e,arg);
-
-    uint tti_ = tokenToMapIndex(t);
-    uint itk_ = arrayIndexToToken(tti-1);
-
-    assert tti_ > 0 => itk_ == t, "case bigger than 0";
-    assert tti_ == 0 => (forall uint j. j > 0 => arrayIndexToToken(j) != t), "case 0";
-}
-*/
+// status: passed
 invariant uniqueTokensInList(uint t)
-    t != 0 => (forall uint i. (forall uint j. /*i > 0 && j > 0 => */((arrayIndexToToken(i) == t && arrayIndexToToken(j) == t) => i == j)))
+    t != 0 => (forall uint i. (forall uint j. ((isListedKey(t,i) && isListedKey(t,j)) => i == j))) {
+        preserved {
+            requireInvariant tokenMapIndexLessThanOrEqNumTokens(t);
+            requireInvariant tokenInMapAppearsInListAndViceVersa(t);
+        }
+    }
 
 /*
 invariant consistencyOfHolderTokens(address k, uint token, uint index)
     holderToToken(k, index) == token <=> holderToIndex(k, token) == index
 */
-invariant consistencyOfTokenOwners(address o, uint t, uint i)
+/*invariant consistencyOfTokenOwners(address o, uint t, uint i)
     arrayIndexToToken(i) == t && arrayIndexToOwner(i) == o => tokenToOwner(t) == o && tokenToMapIndex(t) == i
-
+*/
 invariant ownerOfIsConsistentWithHolderTokens(address k, uint token)
     k != 0 => ownerOf(token) == k => holderToToken(k, holderToIndex(k, token)) == token
 
@@ -208,7 +197,11 @@ invariant sanityTokenOwnerHook(address k, uint i)
 //                       Rules                                            //
 ////////////////////////////////////////////////////////////////////////////
 
+// status: passed
 rule noChangeToOther(uint tokenId, uint otherTokenId, method f) filtered { f -> !f.isFallback } {
+    validToken(tokenId);
+    validToken(otherTokenId);
+
     require tokenId != otherTokenId;
 
     address _tokenOwner = ownerOf(tokenId);
@@ -243,4 +236,14 @@ rule tokenIndexMapsToTokensOwned(address owner, uint index, method f) filtered {
     }
 
     assert true;
+}
+
+////////////////////////////////////////////////////////////////////////////
+//                       Functions                                        //
+////////////////////////////////////////////////////////////////////////////
+function validToken(uint t) {
+    require t != 0;
+    requireInvariant tokenMapIndexLessThanOrEqNumTokens(t);
+    requireInvariant tokenInMapAppearsInListAndViceVersa(t);
+    requireInvariant uniqueTokensInList(t);
 }
