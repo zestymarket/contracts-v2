@@ -132,6 +132,12 @@ invariant tokenMapIndexLessThanOrEqNumTokens(uint t)
         preserved {
             requireInvariant tokenInMapAppearsInListAndViceVersa(t);
         }
+
+        preserved burn(uint256 t2) with (env e) {
+            require t2 != 0;
+            requireInvariant tokenInMapAppearsInListAndViceVersa(t);
+            requireInvariant tokenInMapAppearsInListAndViceVersa(t2);
+        }
     }
 
 invariant tokenInMapAppearsInListAndViceVersa(uint t)
