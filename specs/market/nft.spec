@@ -92,7 +92,7 @@ hook Sload uint key _tokenOwners.(offset 0 /* the array */)[INDEX uint arrayInde
 }
 
 hook Sstore _tokenOwners.(offset 0 /* the array */)[INDEX uint arrayIndex].(offset 32 /* value */) address newValue (address oldValue) STORAGE {
-    uint actualIndex = (arrayIndex - 1)/2;
+    uint actualIndex = (arrayIndex)/2;
     havoc arrayIndexToOwner assuming arrayIndexToOwner@new(actualIndex) == newValue
         && (forall uint i2. arrayIndexToOwner@new(i2) != arrayIndexToOwner@old(i2) => actualIndex == i2);
     address token = arrayIndexToToken(arrayIndex);
@@ -101,7 +101,7 @@ hook Sstore _tokenOwners.(offset 0 /* the array */)[INDEX uint arrayIndex].(offs
 }
 
 hook Sload uint value _tokenOwners.(offset 0 /* the array */)[INDEX uint arrayIndex].(offset 32 /* value */) STORAGE {
-    uint actualIndex = (arrayIndex -1)/2;
+    uint actualIndex = (arrayIndex)/2;
     require arrayIndexToOwner(actualIndex) == value;
 }
 
@@ -128,7 +128,11 @@ hook Sload uint index _tokenOwners.(offset 32 /* the map */)[KEY uint t] STORAGE
 ////////////////////////////////////////////////////////////////////////////
 
 invariant tokenMapIndexLessThanOrEqNumTokens(uint t)
-    tokenToMapIndex(t) <= numTokens()
+    t != 0 => tokenToMapIndex(t) <= numTokens() {
+        preserved {
+            requireInvariant tokenInMapAppearsInListAndViceVersa(t);
+        }
+    }
 
 invariant tokenInMapAppearsInListAndViceVersa(uint t)
     t != 0 => (tokenToMapIndex(t) > 0 => arrayIndexToToken(mapIndexToArrayIndex(tokenToMapIndex(t))) == t)
@@ -146,6 +150,7 @@ invariant tokenInMapAppearsInListAndViceVersa(uint t)
         }
 
         preserved {
+            requireInvariant tokenMapIndexLessThanOrEqNumTokens(t);
             requireInvariant uniqueTokensInList(t);
             requireInvariant uniqueTokensInList(numTokens());
         }
