@@ -86,6 +86,12 @@ contract V2Harness is ZestyMarket_ERC20_V2 {
         return ret;
     }
 
+    function getTokenId(uint256 id) external view returns (uint256) {
+        uint256 ret;
+        (, ret, , , , , , , , , ) = ZestyMarket_ERC20_V2(this).getSellerAuction(id);
+        return ret;
+    }
+
     function getAuctionAutoApproveSetting(uint256 tokenId) external view returns (uint256) {
         uint8 ret;
         (, , ret, ) = ZestyMarket_ERC20_V2(this).getSellerNFTSetting(tokenId);
@@ -111,7 +117,7 @@ contract V2Harness is ZestyMarket_ERC20_V2 {
     }
 
     // used for resetting storage in spec
-    function dummy() external {}
+    function dummy() external view {}
 
 }
 
