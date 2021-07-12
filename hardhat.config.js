@@ -40,11 +40,27 @@ module.exports = {
     },
     rinkeby: {
       url: `https://rinkeby.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+      accounts: [`0x${process.env.PRIVATE_KEY_TEST}`]
+    },
+    arbitrumRinkeby: {
+      url: `https://arbitrum-rinkeby.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+      accounts: [`0x${process.env.PRIVATE_KEY_TEST}`]
+    },
+    mainnet: {
+      url: `https://mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
       accounts: [`0x${process.env.PRIVATE_KEY}`]
     },
     matic: {
-      url: `https://rpc-mainnet.maticvigil.com`,
-      accounts: [`0x${process.env.PRIVATE_KEY_MATIC}`]
+      url: `https://polygon-mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+      accounts: [`0x${process.env.PRIVATE_KEY}`]
+    },
+    arbitrum: {
+      url: `https://arbitrum-mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+      accounts: [`0x${process.env.PRIVATE_KEY}`]
+    },
+    optimism: {
+      url: `https://optimism-mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+      accounts: [`0x${process.env.PRIVATE_KEY}`]
     },
   }
 };
