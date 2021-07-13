@@ -420,7 +420,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, Ownable, ReentrancyGuard {
 
             emit SellerAuctionCancel(_sellerAuctionId[i]);
             emit SellerNFTUpdate(
-                s.tokenId,
+                se.tokenId,
                 se.autoApprove,
                 se.inProgressCount
             );
