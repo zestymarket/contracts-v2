@@ -1040,6 +1040,7 @@ describe('ZestyMarket_ERC20_V1_1', function() {
   });
 
   it('[batched] It should give the owner and buyer the correct cut if the auction is rejected.', async function() {
+    await expect(zestyMarket.connect(signers[2]).setZestyCut(100)).to.be.reverted;
     await zestyMarket.setZestyCut(100);
     expect(await zestyMarket.getZestyCut()).to.equal(100);
 
@@ -1126,6 +1127,7 @@ describe('ZestyMarket_ERC20_V1_1', function() {
   });
 
   it('[batched] It should give the owner and seller the correct cut if the contract is withdrawn.', async function() {
+    await expect(zestyMarket.connect(signers[2]).setZestyCut(100)).to.be.reverted;
     await zestyMarket.setZestyCut(100);
     expect(await zestyMarket.getZestyCut()).to.equal(100);
 
