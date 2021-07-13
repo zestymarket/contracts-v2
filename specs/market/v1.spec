@@ -562,7 +562,6 @@ rule withdrawalIsIrreversible(uint256 contractId, method f) filtered { f -> !f.i
 // status: passed - rule #21 in the report
 // forcing all batch operations to a single element - should be justified by additivity
 // this is the most expensive rule, so commenting it out
-/*
 rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method f) filtered { f -> 
 	!f.isFallback
 	&& f.selector != contractWithdrawBatch(uint256[]).selector // irrelevant here
@@ -592,7 +591,7 @@ rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method
 	}
 	assert _price - price_ == _marketBalance - marketBalance_, "delta in market balance same as delta in price";
 }
-*/
+
 // status: passed - rule #22 in the report
 rule buyerCanWithdraw(uint256 auctionId) {
 	env e;
@@ -655,7 +654,11 @@ rule willFailWithReentrancyGuardEnabled(method f) {
 		|| f.selector == sellerAuctionCreateBatch(uint256,uint256[],uint256[],uint256[],uint256[],uint256[]).selector
 		|| f.selector == sellerBan(address).selector
 		|| f.selector == sellerNFTUpdate(uint256,uint8).selector
-		|| f.selector == sellerUnban(address).selector;
+		|| f.selector == sellerUnban(address).selector
+		|| f.selector == renounceOwnership().selector
+		|| f.selector == setZestyCut(uint256).selector
+		|| f.selector == transferOwnership(address).selector;
+
 
 	assert guardUp => !success || f.isView || noExternalCalls, "non view function succeeded despite reentrancy guard being up";
 }
