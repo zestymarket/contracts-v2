@@ -38,7 +38,7 @@ methods {
 	nft.ownerOf(uint256) returns address envfree
 
 	// dispatcher
-	onERC721Received(address,address,uint256,bytes) => DISPATCHER(true)
+	onERC721Received(address,address,uint256,bytes) => DISPATCHER(true) UNRESOLVED
 }
 
 ////////////////////////////////////////////////////////////////////////////

@@ -4,5 +4,4 @@ certoraRun.py contracts/market/ZestyNFT.sol \
     --cache zesty_nft \
     --rule_sanity \
     --rule $1 \
-    --msg "ZestyNFT" \
-    --staging shelly/robustnessAndCalldatasize
+    --msg "ZestyNFT"

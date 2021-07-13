@@ -6,9 +6,10 @@ contract V1Harness is ZestyMarket_ERC20_V1_1 {
 
     constructor(
         address txTokenAddress_,
-        address zestyNFTAddress_
+        address zestyNFTAddress_,
+        address owner
     ) 
-        ZestyMarket_ERC20_V1_1(txTokenAddress_, zestyNFTAddress_) 
+        ZestyMarket_ERC20_V1_1(txTokenAddress_, zestyNFTAddress_, owner) 
     {
     }
 
