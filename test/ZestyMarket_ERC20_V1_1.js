@@ -20,15 +20,16 @@ describe('ZestyMarket_ERC20_V1_1', function() {
     zestyNFT = await ZestyNFT.deploy(signers[0].address, zestyToken.address);
 
     let ZestyMarket = await ethers.getContractFactory('ZestyMarket_ERC20_V1_1');
-    zestyMarket = await ZestyMarket.deploy(zestyToken.address, zestyNFT.address);
+    zestyMarket = await ZestyMarket.deploy(zestyToken.address, zestyNFT.address, signers[0].address);
     await zestyMarket.deployed();
 
     await zestyNFT.deployed();
     await zestyNFT.mint('testUri');
     await zestyNFT.mint('testUri1');
-    await zestyNFT.mint('testUri2');
+    await zestyNFT.connect(signers[3]).mint('testUri2');
     await zestyNFT.approve(zestyMarket.address, 0);
     await zestyNFT.approve(zestyMarket.address, 1);
+    await zestyNFT.connect(signers[3]).approve(zestyMarket.address, 2);
     await zestyToken.approve(zestyMarket.address, 100000000);
     await zestyToken.transfer(signers[1].address, 100000);
     await zestyToken.connect(signers[1]).approve(zestyMarket.address, 100000000);
@@ -964,7 +965,6 @@ describe('ZestyMarket_ERC20_V1_1', function() {
 
     await time.increase(200);
 
-    console.log("cancel 4,5,6");
     await zestyMarket.sellerAuctionCancelBatch([4,5,6]);
 
     for (let i=4; i<=6; i++) {
@@ -1039,4 +1039,158 @@ describe('ZestyMarket_ERC20_V1_1', function() {
     await expect(zestyMarket.sellerNFTWithdraw(0)).to.be.reverted;
   });
 
+  it('[batched] It should give the owner and buyer the correct cut if the auction is rejected.', async function() {
+    await expect(zestyMarket.connect(signers[2]).setZestyCut(100)).to.be.reverted;
+    await zestyMarket.setZestyCut(100);
+    expect(await zestyMarket.getZestyCut()).to.equal(100);
+
+    // create campaign
+    await zestyMarket.connect(signers[1]).buyerCampaignCreate('testUri');
+
+    // Deposit NFT
+    await zestyMarket.sellerNFTDeposit(0, 1);
+
+    let atsList = [timeNow + 100, timeNow + 100, timeNow + 100];
+    let ateList = [timeNow + 10000, timeNow + 10000, timeNow + 10000];
+    let ctsList = [timeNow + 101, timeNow + 101, timeNow + 101];
+    let cteList = [timeNow + 10001, timeNow + 10001, timeNow + 10001];
+    let priceList = [1000, 1000, 1000];
+
+    await zestyMarket.sellerAuctionCreateBatch(
+      0,
+      atsList,
+      ateList,
+      ctsList,
+      cteList,
+      priceList
+    );
+
+    await expect(zestyMarket.connect(signers[1]).sellerAuctionBidBatch([1,2,3], 1)).to.be.reverted;
+
+    await time.increase(200);
+
+    await zestyMarket.connect(signers[1]).sellerAuctionBidBatch([1,2,3], 1);
+
+    data = await zestyToken.balanceOf(signers[0].address);
+    expect(data).to.equal('99999999999999999999700000');
+
+    data = await zestyToken.balanceOf(signers[1].address);
+    expect(data).to.equal(97039);
+
+    data = await zestyToken.balanceOf(zestyMarket.address);
+    expect(data).to.equal(2961);
+
+    // seller cannot withdraw token after bidding happened
+    await expect(zestyMarket.sellerNFTWithdraw(0)).to.be.reverted;
+
+    // seller cannot cancel once there's a bid
+    await expect(zestyMarket.sellerAuctionCancelBatch([1,2,3])).to.be.reverted;
+
+    await zestyMarket.sellerAuctionRejectBatch([1,2,3]);
+
+    data = await zestyToken.balanceOf(signers[0].address);
+    expect(data).to.equal('99999999999999999999700027');
+
+    data = await zestyToken.balanceOf(signers[1].address);
+    expect(data).to.equal(99973);
+
+    data = await zestyToken.balanceOf(zestyMarket.address);
+    expect(data).to.equal(0);
+
+    // allow cancellation and withdrawal of NFT once rejection occured
+    await zestyMarket.sellerAuctionCancelBatch([1,2,3]);
+    for (let i=1; i<=3; i++) {
+      data = await zestyMarket.getSellerAuction(i);
+      expect(data.seller).to.equal(ethers.constants.AddressZero);
+      expect(data.tokenId).to.equal(0);
+      expect(data.auctionTimeStart).to.equal(0);
+      expect(data.auctionTimeEnd).to.equal(0);
+      expect(data.contractTimeStart).to.equal(0);
+      expect(data.contractTimeEnd).to.equal(0);
+      expect(data.priceStart).to.equal(0);
+      expect(data.pricePending).to.equal(0);
+      expect(data.priceEnd).to.equal(0);
+      expect(data.buyerCampaign).to.equal(0);
+      expect(data.buyerCampaignApproved).to.equal(0);
+    }
+
+    await expect(zestyMarket.sellerAuctionCancelBatch([1,2,3])).to.be.reverted;
+
+    await zestyMarket.sellerNFTWithdraw(0);
+    data = await zestyMarket.getSellerNFTSetting(0);
+    expect(data.tokenId).to.equal(0);
+    expect(data.seller).to.equal(ethers.constants.AddressZero);
+    expect(data.autoApprove).to.equal(0);
+    expect(data.inProgressCount).to.equal(0);
+
+    expect(await zestyNFT.ownerOf(0)).to.equal(signers[0].address);
+  });
+
+  it('[batched] It should give the owner and seller the correct cut if the contract is withdrawn.', async function() {
+    await expect(zestyMarket.connect(signers[2]).setZestyCut(100)).to.be.reverted;
+    await zestyMarket.setZestyCut(100);
+    expect(await zestyMarket.getZestyCut()).to.equal(100);
+
+    // create campaign
+    await zestyMarket.connect(signers[1]).buyerCampaignCreate('testUri');
+
+    // Deposit NFT
+    await zestyMarket.connect(signers[3]).sellerNFTDeposit(2, 2);
+
+    let atsList = [timeNow + 100, timeNow + 100, timeNow + 100];
+    let ateList = [timeNow + 10000, timeNow + 10000, timeNow + 10000];
+    let ctsList = [timeNow + 101, timeNow + 101, timeNow + 101];
+    let cteList = [timeNow + 10001, timeNow + 10001, timeNow + 10001];
+    let priceList = [1000, 1000, 1000];
+
+    await zestyMarket.connect(signers[3]).sellerAuctionCreateBatch(
+      2,
+      atsList,
+      ateList,
+      ctsList,
+      cteList,
+      priceList
+    );
+
+    await expect(zestyMarket.connect(signers[1]).sellerAuctionBidBatch([1,2,3], 1)).to.be.reverted;
+
+    await time.increase(200);
+
+    await zestyMarket.connect(signers[1]).sellerAuctionBidBatch([1,2,3], 1);
+
+    data = await zestyToken.balanceOf(signers[0].address);
+    expect(data).to.equal('99999999999999999999700000');
+
+    data = await zestyToken.balanceOf(signers[1].address);
+    expect(data).to.equal(97039);
+
+    data = await zestyToken.balanceOf(signers[3].address);
+    expect(data).to.equal(100000);
+
+    data = await zestyToken.balanceOf(zestyMarket.address);
+    expect(data).to.equal(2961);
+
+    // seller cannot withdraw token after bidding happened
+    await expect(zestyMarket.connect(signers[3]).sellerNFTWithdraw(0)).to.be.reverted;
+
+    // seller cannot cancel once there's a bid
+    await expect(zestyMarket.connect(signers[3]).sellerAuctionCancelBatch([1,2,3])).to.be.reverted;
+
+    await time.increase(10000);
+
+    await zestyMarket.connect(signers[3]).contractWithdrawBatch([1,2,3]);
+
+    data = await zestyToken.balanceOf(signers[0].address);
+    expect(data).to.equal('99999999999999999999700027');
+
+    data = await zestyToken.balanceOf(signers[1].address);
+    expect(data).to.equal(97039);
+
+    data = await zestyToken.balanceOf(signers[3].address);
+    expect(data).to.equal(102934);
+
+    data = await zestyToken.balanceOf(zestyMarket.address);
+    expect(data).to.equal(0);
+
+  });
 });
