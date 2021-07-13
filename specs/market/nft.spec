@@ -136,7 +136,8 @@ hook Sload uint index _tokenOwners.(offset 32 /* the map */)[KEY uint t] STORAGE
 invariant holderTokenMapIndexLessThanOrEqNumTokens(address owner, uint t)
     (owner != 0 && t != 0) => holderAndTokenToMapIndex(owner, t) <= holderToNumTokens(owner) {
         preserved {
-            requireInvariant holderTokenInListIffInMap(owner, t);
+            validToken(t);
+            validOwnerToken(owner, t);
         }
 
 
@@ -161,29 +162,55 @@ invariant holderTokenMapIndexLessThanOrEqNumTokens(address owner, uint t)
             validOwnerToken(owner, t);
             validOwnerToken(owner, t2);
         }
-        /*
-        preserved safeTransferFrom(address from, address to, uint t2, bytes x) with (env e) {
+        
+        /*preserved safeTransferFrom(address from, address to, uint t2, bytes _) with (env e) {
             validToken(t2);
             validOwnerToken(from, t2);
+            validOwnerToken(owner, t);
+            validOwnerToken(owner, t2);
         }*/
     }
 
 invariant holderTokenInListIffInMap(address owner, uint token) 
     (owner != 0 && token != 0) => ((holderAndTokenToMapIndex(owner, token) > 0 => holderAndArrayIndexToToken(owner, mapIndexToArrayIndex(holderAndTokenToMapIndex(owner, token))) == token)
-    && (holderAndTokenToMapIndex(owner, token) == 0 => (forall uint j. !isListedHolderKey(owner, token, j))))
+    && (holderAndTokenToMapIndex(owner, token) == 0 => (forall uint j. !isListedHolderKey(owner, token, j)))) {
+        preserved {
+            validToken(token);
+            validOwnerToken(owner, token);
+        }
 
-/*
-rule sanity1(address owner, uint token) {
-      require  (owner != 0 && token != 0);
-    require  (owner != 0 && token != 0) => ((holderAndTokenToMapIndex(owner, token) > 0 => holderAndArrayIndexToToken(owner, mapIndexToArrayIndex(holderAndTokenToMapIndex(owner, token))) == token)
-    && (holderAndTokenToMapIndex(owner, token) == 0 => (forall uint j. !isListedHolderKey(owner, token, j))));
+        preserved burn(uint256 t2) with (env e) {
+            require t2 != 0;
+            validToken(token);
+            validToken(t2);
+            validOwnerToken(owner, token);
+            validOwnerToken(owner, t2);
+        }
 
-    env e; calldataarg arg; method f; f(e,arg);
+        preserved transferFrom(address from, address to, uint t2) with (env e) {
+            validToken(token);
+            validToken(t2);
+            validOwnerToken(from, t2);
+            validOwnerToken(owner, token);
+            validOwnerToken(owner, t2);
+        }
 
-    assert  (owner != 0 && token != 0) => ((holderAndTokenToMapIndex(owner, token) > 0 => holderAndArrayIndexToToken(owner, mapIndexToArrayIndex(holderAndTokenToMapIndex(owner, token))) == token)
-    && (holderAndTokenToMapIndex(owner, token) == 0 => (forall uint j. !isListedHolderKey(owner, token, j))));
-   /// assert false;
-}*/
+        preserved safeTransferFrom(address from, address to, uint t2) with (env e) {
+            validToken(token);
+            validToken(t2);
+            validOwnerToken(from, t2);
+            validOwnerToken(owner, token);
+            validOwnerToken(owner, t2);
+        }
+
+        /*preserved safeTransferFrom(address from, address to, uint t2, bytes _) with (env e) {
+            validToken(token);
+            validToken(t2);
+            validOwnerToken(from, t2);
+            validOwnerToken(owner, token);
+            validOwnerToken(owner, t2);
+        }*/
+    }
 
 invariant uniqueHolderTokensInList(address owner, uint t)
     (owner != 0 && t != 0) => (forall uint i. (forall uint j. ((isListedHolderKey(owner, t,i) && isListedHolderKey(owner, t, j)) => i == j))) {
