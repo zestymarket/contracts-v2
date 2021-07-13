@@ -268,7 +268,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, Ownable, ReentrancyGuard {
         SellerNFTSetting storage s = _sellerNFTSettings[_tokenId];
         require(
             s.inProgressCount == 0, 
-            "ZestyMarket_ERC20_V1::sellerNFTWithdraw Auction or Contact is in progress withdraw"
+            "ZestyMarket_ERC20_V1::sellerNFTWithdraw: Auction or Contract is in progress cannot withdraw"
         );
         _withdrawZestyNFT(_tokenId);
         delete _sellerNFTSettings[_tokenId];
