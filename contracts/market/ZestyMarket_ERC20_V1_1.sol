@@ -3,10 +3,11 @@ pragma solidity ^0.7.6;
 
 import "../utils/SafeMath.sol";
 import "../utils/ReentrancyGuard.sol";
+import "../utils/Ownable.sol";
 import "../interfaces/IERC20.sol";
 import "./ZestyVault.sol";
 
-contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
+contract ZestyMarket_ERC20_V1_1 is ZestyVault, Ownable, ReentrancyGuard {
     using SafeMath for uint256;
 
     address private _txTokenAddress;
@@ -16,12 +17,15 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
     uint256 private _contractCount = 1;
     uint8 private constant _FALSE = 1;
     uint8 private constant _TRUE = 2;
+    uint256 private _zestyCut = 0;
 
     constructor(
         address txTokenAddress_,
-        address zestyNFTAddress_
+        address zestyNFTAddress_,
+        address owner_
     ) 
         ZestyVault(zestyNFTAddress_) 
+        Ownable(owner_)
     {
         _txTokenAddress = txTokenAddress_;
         _txToken = IERC20(txTokenAddress_);
@@ -111,6 +115,18 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
 
     function getTxTokenAddress() external view returns (address) {
         return _txTokenAddress;
+    }
+
+    function getZestyCut() external view returns (uint256) {
+        return _zestyCut;
+    }
+
+    function setZestyCut(uint256 zestyCut) external onlyOwner {
+         require(
+            zestyCut <= 2000, 
+            "ZestyMarket_ERC20_V1::setZestyCut: Zesty Cut cannot exceed 20%"
+        );
+        _zestyCut = zestyCut;
     }
 
     function getSellerNFTSetting(uint256 _tokenId) 
@@ -597,11 +613,18 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
                 "ZestyMarket_ERC20_V1::sellerAuctionRejectBatch: Already approved"
             );
 
+            // cut to disincentivize repeated malicious bidding
             uint256 pricePending = s.pricePending;
+            uint256 zestyShare = pricePending.mul(_zestyCut).div(10000);
+            uint256 returnToBuyer = pricePending.sub(zestyShare);
             s.pricePending = 0;
 
             require(
-                _txToken.transfer(_buyerCampaigns[s.buyerCampaign].buyer, pricePending),
+                _txToken.transfer(_buyerCampaigns[s.buyerCampaign].buyer, returnToBuyer),
+                "ZestyMarket_ERC20_V1::sellerAuctionRejectBatch: Transfer of ERC20 failed"
+            );
+            require(
+                _txToken.transfer(owner(), zestyShare),
                 "ZestyMarket_ERC20_V1::sellerAuctionRejectBatch: Transfer of ERC20 failed"
             );
 
@@ -635,10 +658,16 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, ReentrancyGuard {
 
             c.withdrawn = _TRUE;
 
-            require(
-                _txToken.transfer(s.seller, c.contractValue),
-                "ZestyMarket_ERC20_V1::contractWithdrawBatch: Transfer of ERC20 failed"
+            uint256 zestyShare = c.contractValue.mul(_zestyCut).div(10000);
+            uint256 returnToSeller = c.contractValue.sub(zestyShare);
 
+            require(
+                _txToken.transfer(s.seller, returnToSeller),
+                "ZestyMarket_ERC20_V1::contractWithdrawBatch: Transfer of ERC20 failed"
+            );
+            require(
+                _txToken.transfer(owner(), zestyShare),
+                "ZestyMarket_ERC20_V1::contractWithdrawBatch: Transfer of ERC20 failed"
             );
 
             SellerNFTSetting storage se = _sellerNFTSettings[s.tokenId];
