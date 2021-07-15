@@ -97,6 +97,10 @@ contract V1Harness is ZestyMarket_ERC20_V1_1 {
         return ret;
     }
 
+    function getOwner() external view returns (address) {
+        return ZestyMarket_ERC20_V1_1(this).owner();
+    }
+
     // used for resetting storage in spec
     function dummy() external view {}
 

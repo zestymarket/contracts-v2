@@ -28,6 +28,7 @@ methods {
 	getInProgress(uint256) returns uint256 envfree
 	getTokenId(uint256) returns uint256 envfree
 	getBuyer(uint256) returns address envfree
+	getOwner() returns address envfree
 
 	dummy() envfree
 
@@ -573,9 +574,12 @@ rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method
 	uint campaignId = getAuctionBuyerCampaign(auctionId);
 	address buyer = getBuyer(campaignId);
 	require buyer != currentContract; // market cannot be a buyer
+	address owner = getOwner();
+	require owner != currentContract; // market cannot be owner of market
 
 	uint _buyerBalance = token.balanceOf(buyer);
 	uint _marketBalance = token.balanceOf(currentContract);
+	uint _ownerBalance = token.balanceOf(owner);
 
 	mathint _price = getAuctionPricePending(auctionId) + getAuctionPriceEnd(auctionId);
 
@@ -583,11 +587,18 @@ rule deltaInPricePendingPlusPriceEndSameAsBalanceDelta(uint256 auctionId, method
 
 	uint buyerBalance_ = token.balanceOf(buyer);
 	uint marketBalance_ = token.balanceOf(currentContract);
+	uint ownerBalance_ = token.balanceOf(owner);
 
 	mathint price_ = getAuctionPricePending(auctionId) + getAuctionPriceEnd(auctionId);
+	uint8 campaignApproved = getAuctionCampaignApproved(auctionId);
 
-	if (campaignId != 0) {
-		assert _price - price_ == buyerBalance_ - _buyerBalance, "delta in buyer balance same as delta in price";
+	// case where buyer == owner
+	if (campaignId != 0 && buyer == owner) {
+		assert _price - price_ == buyerBalance_ - _buyerBalance, "delta in buyer and owner balance same as delta in price";
+	} 
+	// case where buyer != owner
+	if (campaignId != 0 && buyer != owner) {
+		assert _price - price_ == buyerBalance_ - _buyerBalance + ownerBalance_ - _ownerBalance, "delta in buyer and owner balance same as delta in price";
 	}
 	assert _price - price_ == _marketBalance - marketBalance_, "delta in market balance same as delta in price";
 }
