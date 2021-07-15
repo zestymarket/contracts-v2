@@ -11,16 +11,19 @@ async function main() {
   // matic usdc address
   let ERC20Address = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174";
 
+  // multisig address
+  let MultiSigAddress = "0xB0270654a0158c8aD52a955f7Fd399474B2107a5";
+
   const ZestyNFT = await hre.ethers.getContractFactory("ZestyNFT");
   const zestyNFT = await ZestyNFT.deploy(
-    "0xB0270654a0158c8aD52a955f7Fd399474B2107a5", 
+    MultiSigAddress, 
     ethers.constants.AddressZero
   );
   await zestyNFT.deployed();
   console.log("ZestyNFT deployed to:", zestyNFT.address);
 
   const ZestyMarket = await hre.ethers.getContractFactory("ZestyMarket_ERC20_V1_1");
-  const zestyMarket = await ZestyMarket.deploy(ERC20Address, zestyNFT.address);
+  const zestyMarket = await ZestyMarket.deploy(ERC20Address, zestyNFT.address, MultiSigAddress);
   await zestyMarket.deployed();
   console.log("ZestyMarket_ERC20_V1_1 deployed to:", zestyMarket.address);
 }

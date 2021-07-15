@@ -61,13 +61,13 @@ Documentation about the contracts can be found on our [documentation site https:
 1. ZestyNFT.sol
 ```
 Rinkeby: 0xa6fC03b3343D72630db8767B179C90b0ccd61354
-Matic: 0x77E3a084DEf013D52a9B82fB82BCc515029A75Bb
+Matic: 0xBA7Cd9f08b9a70F05e93025bD26105f2C91aFF0a
 ```
 
 1. ZestyMarket_ERC20_V1_1
 ```
 Rinkeby (USDC Compound): 0xD6551e7CD4DBbaf4F9186665Faa7A869868DC73e
-Matic (USDC): 0x977a1Fe9BdB6404d2918D901aa25bAAAf1629554
+Matic (USDC): 0x8645A4D5fB4816EDec2ae4B1B822B11260830043
 ```
 
 1. StreamGame_ETH
