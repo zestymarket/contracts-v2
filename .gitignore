@@ -6,6 +6,6 @@ cache
 artifacts
 
 # Certora
-.certora*
-.tmp.*
+/.certora_*
 .last_confs
+.tmp*
