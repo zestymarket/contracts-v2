@@ -364,7 +364,7 @@ contract ZestyMarket_ERC20_V2 is ZestyVault, RewardsRecipient, ReentrancyGuard {
         SellerNFTSetting storage s = _sellerNFTSettings[_tokenId];
         require(
             s.inProgressCount == 0, 
-            "ZestyMarket_ERC20_V2::sellerNFTWithdraw Auction or Contact is in progress withdraw"
+            "ZestyMarket_ERC20_V2::sellerNFTWithdraw: Auction or Contract is in progress cannot withdraw"
         );
         _withdrawZestyNFT(_tokenId);
         delete _sellerNFTSettings[_tokenId];
