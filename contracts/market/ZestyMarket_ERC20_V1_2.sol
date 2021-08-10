@@ -7,7 +7,7 @@ import "../utils/Ownable.sol";
 import "../interfaces/IERC20.sol";
 import "./ZestyVault.sol";
 
-contract ZestyMarket_ERC20_V1_1 is ZestyVault, Ownable, ReentrancyGuard {
+contract ZestyMarket_ERC20_V1_2 is ZestyVault, Ownable, ReentrancyGuard {
     using SafeMath for uint256;
 
     address private _txTokenAddress;
@@ -174,7 +174,8 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, Ownable, ReentrancyGuard {
             uint256 priceEnd,
             uint256 buyerCampaign,
             uint8 buyerCampaignApproved,
-            address privateBuyer
+            address privateBuyer,
+            uint8 saleType
         )
     {
         seller = _sellerAuctions[_sellerAuctionId].seller;
@@ -189,6 +190,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, Ownable, ReentrancyGuard {
         buyerCampaign = _sellerAuctions[_sellerAuctionId].buyerCampaign;
         buyerCampaignApproved = _sellerAuctions[_sellerAuctionId].buyerCampaignApproved;
         privateBuyer = _sellerAuctions[_sellerAuctionId].privateBuyer;
+        saleType = _sellerAuctions[_sellerAuctionId].saleType;
     }
 
     function getBuyerCampaign(uint256 _buyerCampaignId)
@@ -331,7 +333,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, Ownable, ReentrancyGuard {
             _contractTimeStart.length == _contractTimeEnd.length &&
             _contractTimeEnd.length == _priceStart.length &&
             _priceStart.length == _privateBuyer.length &&
-            _privateBuyer.length == _saleType.length &&,
+            _privateBuyer.length == _saleType.length,
             "ZestyMarket_ERC20_V1::sellerAuctionCreateBatch: Array length not equal"
         );
 
@@ -369,7 +371,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, Ownable, ReentrancyGuard {
             require(
                 _saleType[i] > 0,
                 "ZestyMarket_ERC20_V1::sellerAuctionCreateBatch: Invalid sale type"
-            )
+            );
 
             SellerNFTSetting storage s = _sellerNFTSettings[_tokenId];
             s.inProgressCount = s.inProgressCount.add(1);
@@ -485,7 +487,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, Ownable, ReentrancyGuard {
                 require(
                     b.buyer == s.privateBuyer,
                     "ZestyMarket_ERC20_V1::sellerAuctionBidBatch: Not private buyer"
-                )
+                );
             }
 
             s.buyerCampaign = _buyerCampaignId;
@@ -495,7 +497,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, Ownable, ReentrancyGuard {
                 price = getSellerAuctionPrice(_sellerAuctionId[i]);
             }
             if (s.saleType == 2) {
-                price = s.startPrice;
+                price = s.priceStart;
             }
 
             require(
@@ -588,6 +590,7 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, Ownable, ReentrancyGuard {
                 "ZestyMarket_ERC20_V1::sellerAuctionApproveBatch: Already approved"
             );
 
+            uint256 toTransfer = 0;
             if (s.saleType == 1) {
                 uint256 price = getSellerAuctionPrice(_sellerAuctionId[i]);
                 require(
@@ -596,17 +599,18 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, Ownable, ReentrancyGuard {
                 );
 
                 s.priceEnd = price;
-                uint256 priceDiff = s.pricePending.sub(s.priceEnd);
+                toTransfer = s.pricePending.sub(s.priceEnd);
                 s.pricePending = 0;
             }
 
             if (s.saleType == 2) {
                 s.priceEnd = s.pricePending;
+                toTransfer = s.pricePending;
                 s.pricePending = 0;
             }
 
             require(
-                _txToken.transfer(_buyerCampaigns[s.buyerCampaign].buyer, priceDiff),
+                _txToken.transfer(_buyerCampaigns[s.buyerCampaign].buyer, toTransfer),
                 "ZestyMarket_ERC20_V1::sellerAuctionApproveBatch: Transfer of ERC20 failed"
             );
 
@@ -653,19 +657,19 @@ contract ZestyMarket_ERC20_V1_1 is ZestyVault, Ownable, ReentrancyGuard {
 
             // cut to disincentivize repeated malicious bidding
             uint256 returnToBuyer = s.pricePending;
-            if (s.saleType == 1) {
+            if (s.privateBuyer != address(0)) {
                 uint256 pricePending = s.pricePending;
                 uint256 zestyShare = pricePending.mul(_zestyCut).div(10000);
                 returnToBuyer = pricePending.sub(zestyShare);
                 s.pricePending = 0;
+                require(
+                    _txToken.transfer(owner(), zestyShare),
+                    "ZestyMarket_ERC20_V1::sellerAuctionRejectBatch: Transfer of ERC20 failed"
+                );
             }
 
             require(
                 _txToken.transfer(_buyerCampaigns[s.buyerCampaign].buyer, returnToBuyer),
-                "ZestyMarket_ERC20_V1::sellerAuctionRejectBatch: Transfer of ERC20 failed"
-            );
-            require(
-                _txToken.transfer(owner(), zestyShare),
                 "ZestyMarket_ERC20_V1::sellerAuctionRejectBatch: Transfer of ERC20 failed"
             );
 

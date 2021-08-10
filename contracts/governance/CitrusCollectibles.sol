@@ -30,13 +30,13 @@ contract CitrusCollectibles is ERC1155, Ownable, Pausable {
         onlyOwner 
         public 
     {
-        _mint(account, id, amount, data);
+        _mint(account, id, amounts, data);
     }
 
     function mintBatch(
         address account, 
         uint256[] memory ids, 
-        uint256[] memory amount, 
+        uint256[] memory amounts, 
         bytes memory data
     ) 
         onlyOwner 
@@ -53,13 +53,13 @@ contract CitrusCollectibles is ERC1155, Ownable, Pausable {
         onlyOwner 
         public 
     {
-        _burn(account, id, amount);
+        _burn(account, id, amounts);
     }
 
     function burnBatch(
         address account, 
         uint256[] memory ids, 
-        uint256[] memory amount
+        uint256[] memory amounts
     ) 
         onlyOwner 
         public 
