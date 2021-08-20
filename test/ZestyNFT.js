@@ -101,4 +101,8 @@ describe('ZestyNFT', function() {
     expect(await zestyToken.balanceOf(zestyNFT.address)).to.equal(0);
 
   });
+
+  it('It should not allow an external party to set ZestyToken address', async function() {
+    await expect(zestyNFT.connect(signers[3]).setZestyTokenAddress(zestyToken.address)).to.be.reverted;
+  });
 });
