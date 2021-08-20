@@ -18,7 +18,7 @@ async function main() {
   console.log("ZestyNFT deployed to:", zestyNFT.address);
 
   const ZestyMarket = await hre.ethers.getContractFactory("ZestyMarket_ERC20_V1_1");
-  const zestyMarket = await ZestyMarket.deploy(zestyToken.address, zestyNFT.address);
+  const zestyMarket = await ZestyMarket.deploy(zestyToken.address, zestyNFT.address, signers[0].address);
   await zestyMarket.deployed();
   console.log("ZestyMarket_ERC20_V1 deployed to:", zestyMarket.address);
 
