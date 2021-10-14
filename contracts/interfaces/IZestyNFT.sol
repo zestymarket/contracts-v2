@@ -7,7 +7,7 @@ import "./IERC721.sol";
 /**
  * @dev Required interface of an ERC721 compliant contract.
  */
-interface IZestyNFT is IERC721 {
+interface IZestyNFT is IERC721, IERC721Metadata, IERC721Enumerable {
     function getTokenData(uint256 tokenId) 
     external
     view 
