@@ -2,6 +2,7 @@
 pragma solidity ^0.7.6;
 
 import "../utils/Context.sol";
+import "../utils/SafeMath.sol";
 import "../interfaces/IERC721Receiver.sol";
 import "../interfaces/IZestyNFT.sol";
 
@@ -10,10 +11,12 @@ import "../interfaces/IZestyNFT.sol";
  * @author Zesty Market
  * @notice Contract for depositing and withdrawing ZestyNFTs
  */
-abstract contract ZestyVault is Context, IERC721Receiver {
+abstract contract ZestyVault_V2 is Context, IERC721Receiver {
+    using SafeMath for uint256;
+
     address private _zestyNFTAddress;
     IZestyNFT internal _zestyNFT;
-    uint256 private _depositCount = 0;
+    uint256 public _depositCount = 0;
     
     constructor(address zestyNFTAddress_) {
         _zestyNFTAddress = zestyNFTAddress_;
@@ -42,10 +45,10 @@ abstract contract ZestyVault is Context, IERC721Receiver {
     }
 
     function isDepositor(uint256 _depositId) public virtual view returns (bool) {
-        return _msgSender() == getDepositor(_tokenId);
+        return _msgSender() == getDepositor(_depositId);
     }
 
-    function getTokenId(uint256 _depositId) public virtual view returns (bool) {
+    function getTokenId(uint256 _depositId) public virtual view returns (uint256) {
         return _depositIdToTokenId[_depositId];
     }
 
@@ -86,7 +89,7 @@ abstract contract ZestyVault is Context, IERC721Receiver {
             "ZestyVault::_depositZestyNFT: Contract is not approved to manage token"
         );
 
-        _depositCount.add(1);
+        _depositCount = _depositCount.add(1);
 
         _depositIdToTokenId[_depositCount] = _tokenId;
         _nftDeposits[_depositCount] = _msgSender();
@@ -97,12 +100,12 @@ abstract contract ZestyVault is Context, IERC721Receiver {
         return _depositCount;
     }
 
-    function _withdrawZestyNFT(uint256 _tokenId) internal virtual onlyDepositor(_tokenId) {
-        delete _nftDeposits[_tokenId];
+    function _withdrawZestyNFT(uint256 _depositId) internal virtual onlyDepositor(_depositId) {
+        uint256 _tokenId = getTokenId(_depositId);
 
         _zestyNFT.safeTransferFrom(address(this), _msgSender(), _tokenId);
 
-        emit WithdrawZestyNFT(_tokenId);
+        emit WithdrawZestyNFT(_depositId, _tokenId);
     }
 
     function onERC721Received(address, address, uint256, bytes memory) public virtual override returns (bytes4) {

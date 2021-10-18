@@ -2,9 +2,6 @@
 
 pragma solidity >=0.6.2 <0.8.0;
 
-/**
- * @dev Required interface of an ERC721 compliant contract.
- */
 interface IZestyMarket_ERC20_V1_1 {
     function getTxTokenAddress() external view returns (address);
     function getZestyCut() external view returns (uint256);
@@ -58,7 +55,7 @@ interface IZestyMarket_ERC20_V1_1 {
         uint8 _autoApprove
     ) 
         external;
-    function sellerNFTWithdraw(uint256 _tokenId) external onlyDepositor(_tokenId);
+    function sellerNFTWithdraw(uint256 _tokenId) external;
     function sellerNFTUpdate(
         uint256 _tokenId,
         uint8 _autoApprove

@@ -3,9 +3,11 @@
 pragma solidity >=0.6.2 <0.8.0;
 
 import "./IERC721.sol";
+import "./IERC721Metadata.sol";
+import "./IERC721Enumerable.sol";
 
 /**
- * @dev Required interface of an ERC721 compliant contract.
+ * @dev Required interface of an ZestyNFT compliant contract.
  */
 interface IZestyNFT is IERC721, IERC721Metadata, IERC721Enumerable {
     function getTokenData(uint256 tokenId) 
