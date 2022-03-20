@@ -127,6 +127,10 @@ async function main() {
   );
   await time.increase(600);
   await zestyMarket.connect(signers[1]).sellerAuctionBidBatch([4], 1);
+
+  await zestyNFT.connect(signers[2]).mint('testUri');
+  await zestyNFT.connect(signers[2]).approve(zestyMarket.address, 5);
+  await zestyMarket.connect(signers[2]).sellerNFTDeposit(5, 1);
 }
 
 main()
