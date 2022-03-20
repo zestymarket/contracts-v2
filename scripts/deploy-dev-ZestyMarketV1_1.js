@@ -24,6 +24,7 @@ async function main() {
 
   await zestyNFT.mint('testUri');
   await zestyNFT.mint('testUri1');
+  await zestyNFT.transferFrom(signers[0].address, signers[1].address, 1);
   await zestyNFT.mint('testUri2');
   await zestyNFT.approve(zestyMarket.address, 0);
   await zestyToken.approve(zestyMarket.address, 100000000000);
