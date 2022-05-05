@@ -132,6 +132,11 @@ async function main() {
   await zestyNFT.connect(signers[2]).mint('testUri');
   await zestyNFT.connect(signers[2]).approve(zestyMarket.address, 5);
   await zestyMarket.connect(signers[2]).sellerNFTDeposit(5, 1);
+
+  await zestyMarket.authorizeOperator(signers[1].address);
+  await zestyMarket.connect(signers[2]).authorizeOperator(signers[3].address);
+
+  await zestyMarket.revokeOperator(signers[1].address);
 }
 
 main()
