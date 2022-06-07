@@ -4,23 +4,26 @@ pragma experimental ABIEncoderV2;
 
 import "../utils/ReentrancyGuard.sol";
 import "../utils/EnumerableSet.sol";
-import "../utils/PaymentSplitter.sol";
 import "../interfaces/IZestyMarket_ERC20_V1_1.sol";
 import "../interfaces/IZestyNFT.sol";
+import "../interfaces/ISplitMain.sol";
 
 contract ZestyRevenueShareWrapper is ReentrancyGuard {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   IZestyMarket_ERC20_V1_1 public zestyMarketAddress;
-  PaymentSplitter public paymentSplitter;
+  ISplitMain public constant splitMain = ISplitMain(0x2ed6c4B5dA6378c7897AC67Ba9e43102Feb694EE);
+  address public supportedERC20Token;
   mapping(uint256 => address) public owners;
+  mapping(uint256 => address) public splits;
 
-  constructor(address zestyMarketAddress_, address payable paymentSplitter_) {
+  constructor(address zestyMarketAddress_, address supportedERC20Token_) {
     zestyMarketAddress = IZestyMarket_ERC20_V1_1(zestyMarketAddress_);
-    paymentSplitter = PaymentSplitter(paymentSplitter_);
+    supportedERC20Token = supportedERC20Token_;
   }
 
-  function sellerNFTDeposit(uint256 _tokenId, uint8 _autoApprove, address[] calldata recipients_, uint256[] calldata shares_) external nonReentrant {
+  // Total sum of shares should be equal to 1e6
+  function sellerNFTDeposit(uint256 _tokenId, uint8 _autoApprove, address[] calldata recipients_, uint32[] calldata shares_) external nonReentrant {
     require(recipients_.length <= 20, "Too many recipients");
     require(recipients_.length == shares_.length, "Length mismatch");
     IZestyNFT _zestyNFT = IZestyNFT(zestyMarketAddress.getZestyNFTAddress());
@@ -31,11 +34,17 @@ contract ZestyRevenueShareWrapper is ReentrancyGuard {
     );
 
     owners[_tokenId] = msg.sender;
-    paymentSplitter.addPayees(recipients_, shares_);
 
     _zestyNFT.safeTransferFrom(msg.sender, address(this), _tokenId);
     _zestyNFT.approve(address(zestyMarketAddress), _tokenId);
     zestyMarketAddress.sellerNFTDeposit(_tokenId, _autoApprove);
+
+    if(splits[_tokenId] != address(0)) {
+      // Already existing
+      splitMain.updateSplit(splits[_tokenId], recipients_, shares_, 0);
+    } else {
+      splits[_tokenId] = splitMain.createSplit(recipients_, shares_, 0, address(this));
+    }
   }
 
   function sellerNFTWithdraw(uint256 _tokenId) external onlyDepositOwner(_tokenId) {
@@ -43,22 +52,21 @@ contract ZestyRevenueShareWrapper is ReentrancyGuard {
     IZestyNFT _zestyNFT = IZestyNFT(zestyMarketAddress.getZestyNFTAddress());
     _zestyNFT.safeTransferFrom(address(this), msg.sender, _tokenId);
     owners[_tokenId] = address(0);
-    // clear recipients TO-do
-    // uint256 length = _recipients[_tokenId].length();
-    // for(uint256 i = 0; i < length; i ++) {
-    //   _recipients[_tokenId].remove(_recipients[_tokenId].at(0));
-    // }
   }
 
-  // To-do
-  function addRecipient(uint256 _tokenId, address newRecipient) external onlyDepositOwner(_tokenId) returns(bool success) {
-    // require(_recipients[_tokenId].length() < 20, "Too many recipients");
-    // success = _recipients[_tokenId].add(newRecipient);
+  function distributeETH(uint256 _tokenId, address[] calldata recipients_, uint32[] calldata shares_) external onlyDepositOwner(_tokenId) {
+    require(splits[_tokenId] != address(0), "Split not existing");
+    splitMain.distributeETH(splits[_tokenId], recipients_, shares_, 0, address(this));
   }
 
-  // To-do
-  function removeRecipient(uint256 _tokenId, address oldRecipient) external onlyDepositOwner(_tokenId) returns(bool success) {
-    // success = _recipients[_tokenId].remove(oldRecipient);
+  function distributeERC20(uint256 _tokenId, address[] calldata recipients_, uint32[] calldata shares_) external onlyDepositOwner(_tokenId) {
+    require(splits[_tokenId] != address(0), "Split not existing");
+    splitMain.distributeERC20(splits[_tokenId], supportedERC20Token, recipients_, shares_, 0, address(this));
+  }
+
+  function updateSplit(uint256 _tokenId,  address[] calldata recipients_, uint32[] calldata shares_) external onlyDepositOwner(_tokenId) {
+    require(splits[_tokenId] != address(0), "Split not existing");
+    splitMain.updateSplit(splits[_tokenId], recipients_, shares_, 0);
   }
 
   modifier onlyDepositOwner(uint256 _tokenId) {
