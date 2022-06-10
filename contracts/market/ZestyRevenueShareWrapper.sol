@@ -7,19 +7,22 @@ import "../utils/EnumerableSet.sol";
 import "../interfaces/IZestyMarket_ERC20_V1_1.sol";
 import "../interfaces/IZestyNFT.sol";
 import "../interfaces/ISplitMain.sol";
+import "../utils/ERC20.sol";
 
 contract ZestyRevenueShareWrapper is ReentrancyGuard {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   IZestyMarket_ERC20_V1_1 public zestyMarketAddress;
-  ISplitMain public constant splitMain = ISplitMain(0x2ed6c4B5dA6378c7897AC67Ba9e43102Feb694EE);
-  address public supportedERC20Token;
+  // main address on polygon 0x2ed6c4B5dA6378c7897AC67Ba9e43102Feb694EE 
+  ISplitMain public immutable splitMain;
+  ERC20 public supportedERC20Token;
   mapping(uint256 => address) public owners;
   mapping(uint256 => address) public splits;
 
-  constructor(address zestyMarketAddress_, address supportedERC20Token_) {
+  constructor(address zestyMarketAddress_, address supportedERC20Token_, address splitMainAddress_) {
     zestyMarketAddress = IZestyMarket_ERC20_V1_1(zestyMarketAddress_);
-    supportedERC20Token = supportedERC20Token_;
+    splitMain = ISplitMain(splitMainAddress_);
+    supportedERC20Token = ERC20(supportedERC20Token_);
   }
 
   // Total sum of shares should be equal to 1e6
