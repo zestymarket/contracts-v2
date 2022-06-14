@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity >=0.6.2 <0.8.0;
+pragma solidity >=0.6.2;
 
 interface IZestyMarket_ERC20_V1_1 {
     function getZestyNFTAddress() external view returns (address);

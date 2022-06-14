@@ -6,72 +6,9 @@ import {SplitWallet} from './SplitWallet.sol';
 import {Clones} from './Clones.sol';
 import {ERC20} from './ERC20.sol';
 import {SafeTransferLib} from './SafeTransferLib.sol';
-
-/**
-
-                                             █████████
-                                          ███████████████                  █████████
-                                         █████████████████               █████████████                 ███████
-                                        ███████████████████             ███████████████               █████████
-                                        ███████████████████             ███████████████              ███████████
-                                        ███████████████████             ███████████████               █████████
-                                         █████████████████               █████████████                 ███████
-                                          ███████████████                  █████████
-                                             █████████
-
-                             ███████████
-                          █████████████████                 █████████
-                         ███████████████████             ███████████████                  █████████
-                        █████████████████████           █████████████████               █████████████                ███████
-                       ███████████████████████         ███████████████████             ███████████████              █████████
-                       ███████████████████████         ███████████████████             ███████████████             ███████████
-                       ███████████████████████         ███████████████████             ███████████████              █████████
-                        █████████████████████           █████████████████               █████████████                ███████
-                         ███████████████████              █████████████                   █████████
-                          █████████████████                 █████████
-                             ███████████
-
-           ███████████
-       ███████████████████                  ███████████
-     ███████████████████████              ███████████████                  █████████
-    █████████████████████████           ███████████████████             ███████████████               █████████
-   ███████████████████████████         █████████████████████           █████████████████            █████████████              ███████
-   ███████████████████████████        ███████████████████████         ███████████████████          ███████████████            █████████
-   ███████████████████████████        ███████████████████████         ███████████████████          ███████████████           ███████████
-   ███████████████████████████        ███████████████████████         ███████████████████          ███████████████            █████████
-   ███████████████████████████         █████████████████████           █████████████████            █████████████              ███████
-    █████████████████████████           ███████████████████              █████████████                █████████
-      █████████████████████               ███████████████                  █████████
-        █████████████████                   ███████████
-           ███████████
-
-                             ███████████
-                          █████████████████                 █████████
-                         ███████████████████             ███████████████                  █████████
-                        █████████████████████           █████████████████               █████████████                ███████
-                       ███████████████████████         ███████████████████             ███████████████              █████████
-                       ███████████████████████         ███████████████████             ███████████████             ███████████
-                       ███████████████████████         ███████████████████             ███████████████              █████████
-                        █████████████████████           █████████████████               █████████████                ███████
-                         ███████████████████              █████████████                   █████████
-                          █████████████████                 █████████
-                             ███████████
-
-                                             █████████
-                                          ███████████████                  █████████
-                                         █████████████████               █████████████                 ███████
-                                        ███████████████████             ███████████████               █████████
-                                        ███████████████████             ███████████████              ███████████
-                                        ███████████████████             ███████████████               █████████
-                                         █████████████████               █████████████                 ███████
-                                          ███████████████                  █████████
-                                             █████████
-
- */
-
-/**
- * ERRORS
- */
+import "../../interfaces/IZestyMarket_ERC20_V1_1.sol";
+import "../../interfaces/IZestyNFT.sol";
+import "../ReentrancyGuard.sol";
 
 /// @notice Unauthorized sender `sender`
 /// @param sender Transaction sender
@@ -114,7 +51,7 @@ error InvalidNewController(address newController);
  * For these proxies, we extended EIP-1167 Minimal Proxy Contract to avoid `DELEGATECALL` inside `receive()` to accept
  * hard gas-capped `sends` & `transfers`.
  */
-contract SplitMain is ISplitMain {
+contract SplitMain is ISplitMain, ReentrancyGuard {
   using SafeTransferLib for address;
   using SafeTransferLib for ERC20;
 
@@ -143,6 +80,10 @@ contract SplitMain is ISplitMain {
   uint256 internal constant MAX_DISTRIBUTOR_FEE = 1e5;
   /// @notice address of wallet implementation for split proxies
   address public immutable override walletImplementation;
+  /// @notice zesty market address
+  IZestyMarket_ERC20_V1_1 public zestyMarketAddress;
+  /// @notice supported ERC20 token: USDC
+  address public supportedERC20Token;
 
   /**
    * STORAGE - VARIABLES - PRIVATE & INTERNAL
@@ -154,6 +95,10 @@ contract SplitMain is ISplitMain {
   mapping(ERC20 => mapping(address => uint256)) internal erc20Balances;
   /// @notice mapping to Split metadata
   mapping(address => Split) internal splits;
+  /// @notice mapping to NFT owners
+  mapping(uint256 => address) public owners;
+  /// @notice mapping to split addresses
+  mapping(uint256 => address) public tokenIdToSplits;
 
   /**
    * MODIFIERS
@@ -173,6 +118,11 @@ contract SplitMain is ISplitMain {
   modifier onlySplitNewPotentialController(address split) {
     if (msg.sender != splits[split].newPotentialController)
       revert Unauthorized(msg.sender);
+    _;
+  }
+
+  modifier onlyDepositOwner(uint256 _tokenId) {
+    require(msg.sender == owners[_tokenId], "Not owner");
     _;
   }
 
@@ -228,8 +178,10 @@ contract SplitMain is ISplitMain {
    * CONSTRUCTOR
    */
 
-  constructor() {
+  constructor(address zestyMarketAddress_, address supportedERC20Token_) {
     walletImplementation = address(new SplitWallet());
+    zestyMarketAddress = IZestyMarket_ERC20_V1_1(zestyMarketAddress_);
+    supportedERC20Token = supportedERC20Token_;
   }
 
   /**
@@ -259,8 +211,7 @@ contract SplitMain is ISplitMain {
     uint32 distributorFee,
     address controller
   )
-    external
-    override
+    internal
     validSplit(accounts, percentAllocations, distributorFee)
     returns (address split)
   {
@@ -319,8 +270,7 @@ contract SplitMain is ISplitMain {
     uint32[] calldata percentAllocations,
     uint32 distributorFee
   )
-    external
-    override
+    internal
     onlySplitController(split)
     validSplit(accounts, percentAllocations, distributorFee)
   {
@@ -443,30 +393,19 @@ contract SplitMain is ISplitMain {
    *  & comparing to the hash in storage associated with split `split`
    *  @dev pernicious ERC20s may cause overflow in this function inside
    *  _scaleAmountByPercentage, but results do not affect ETH & other ERC20 balances
-   *  @param split Address of split to distribute balance for
-   *  @param token Address of ERC20 to distribute balance for
-   *  @param accounts Ordered, unique list of addresses with ownership in the split
-   *  @param percentAllocations Percent allocations associated with each address
-   *  @param distributorFee Keeper fee paid by split to cover gas costs of distribution
-   *  @param distributorAddress Address to pay `distributorFee` to
+   *  @param tokenId NFT token Id
    */
   function distributeERC20(
-    address split,
-    ERC20 token,
-    address[] calldata accounts,
-    uint32[] calldata percentAllocations,
-    uint32 distributorFee,
-    address distributorAddress
-  ) external override validSplit(accounts, percentAllocations, distributorFee) {
+    uint256 tokenId
+  ) external override {
     // use internal fn instead of modifier to avoid stack depth compiler errors
-    _validSplitHash(split, accounts, percentAllocations, distributorFee);
     _distributeERC20(
-      split,
-      token,
+      tokenIdToSplits[tokenId],
+      supportedERC20Token,
       accounts,
       percentAllocations,
-      distributorFee,
-      distributorAddress
+      0,
+      address(this)
     );
   }
 
@@ -529,6 +468,38 @@ contract SplitMain is ISplitMain {
       }
       emit Withdrawal(account, ethAmount, tokens, tokenAmounts);
     }
+  }
+
+  // Total sum of shares should be equal to 1e6
+  function sellerNFTDeposit(uint256 _tokenId, uint8 _autoApprove, address[] calldata recipients_, uint32[] calldata shares_) external nonReentrant {
+    require(recipients_.length <= 20, "Too many recipients");
+    require(recipients_.length == shares_.length, "Length mismatch");
+    IZestyNFT _zestyNFT = IZestyNFT(zestyMarketAddress.getZestyNFTAddress());
+    require(
+      _zestyNFT.ownerOf(_tokenId) == msg.sender &&
+      _zestyNFT.getApproved(_tokenId) == address(this),
+      "Contract is not approved to manage token"
+    );
+
+    owners[_tokenId] = msg.sender;
+
+    _zestyNFT.safeTransferFrom(msg.sender, address(this), _tokenId);
+    _zestyNFT.approve(address(zestyMarketAddress), _tokenId);
+    zestyMarketAddress.sellerNFTDeposit(_tokenId, _autoApprove);
+
+    if(tokenIdToSplits[_tokenId] != address(0)) {
+      // Already existing
+      updateSplit(tokenIdToSplits[_tokenId], recipients_, shares_, 0);
+    } else {
+      tokenIdToSplits[_tokenId] = createSplit(recipients_, shares_, 0, address(this));
+    }
+  }
+
+  function sellerNFTWithdraw(uint256 _tokenId) external onlyDepositOwner(_tokenId) {
+    zestyMarketAddress.sellerNFTWithdraw(_tokenId);
+    IZestyNFT _zestyNFT = IZestyNFT(zestyMarketAddress.getZestyNFTAddress());
+    _zestyNFT.safeTransferFrom(address(this), msg.sender, _tokenId);
+    owners[_tokenId] = address(0);
   }
 
   /**

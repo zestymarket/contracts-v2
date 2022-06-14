@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.4;
+pragma solidity 0.8.4;
 
 import {ERC20} from './ERC20.sol';
 
@@ -14,25 +14,11 @@ interface ISplitMain {
 
   function walletImplementation() external returns (address);
 
-  function createSplit(
-    address[] calldata accounts,
-    uint32[] calldata percentAllocations,
-    uint32 distributorFee,
-    address controller
-  ) external returns (address);
-
   function predictImmutableSplitAddress(
     address[] calldata accounts,
     uint32[] calldata percentAllocations,
     uint32 distributorFee
   ) external view returns (address);
-
-  function updateSplit(
-    address split,
-    address[] calldata accounts,
-    uint32[] calldata percentAllocations,
-    uint32 distributorFee
-  ) external;
 
   function transferControl(address split, address newController) external;
 
