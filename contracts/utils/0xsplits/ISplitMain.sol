@@ -36,30 +36,10 @@ interface ISplitMain {
     address distributorAddress
   ) external;
 
-  function updateAndDistributeETH(
-    address split,
-    address[] calldata accounts,
-    uint32[] calldata percentAllocations,
-    uint32 distributorFee,
-    address distributorAddress
-  ) external;
-
   function distributeERC20(
-    address split,
-    ERC20 token,
+    uint256 tokenId,
     address[] calldata accounts,
-    uint32[] calldata percentAllocations,
-    uint32 distributorFee,
-    address distributorAddress
-  ) external;
-
-  function updateAndDistributeERC20(
-    address split,
-    ERC20 token,
-    address[] calldata accounts,
-    uint32[] calldata percentAllocations,
-    uint32 distributorFee,
-    address distributorAddress
+    uint32[] calldata percentAllocations
   ) external;
 
   function withdraw(

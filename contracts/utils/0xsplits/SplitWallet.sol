@@ -4,6 +4,7 @@ pragma solidity 0.8.4;
 import {ISplitMain} from './ISplitMain.sol';
 import {ERC20} from './ERC20.sol';
 import {SafeTransferLib} from './SafeTransferLib.sol';
+import "../../interfaces/IZestyMarket_ERC20_V1_1.sol";
 
 /**
  * ERRORS
@@ -43,6 +44,18 @@ contract SplitWallet {
   /// @notice address of SplitMain for split distributions & EOA/SC withdrawals
   ISplitMain public immutable splitMain;
 
+  /// @notice tokenId of the NFT
+  uint256 private tokenId;
+
+  /// @notice zesty market address
+  IZestyMarket_ERC20_V1_1 public zestyMarketAddress;
+
+  /// @notice recipient addresses
+  address[] private accounts;
+  
+  /// @notice percentage shares
+  uint32[] private percentAllocations;
+
   /**
    * MODIFIERS
    */
@@ -64,6 +77,15 @@ contract SplitWallet {
   /**
    * FUNCTIONS - PUBLIC & EXTERNAL
    */
+
+  function init(uint256 tokenId_, address zestyMarketAddress_, address[] memory accounts_, uint32[] memory percentAllocations_) external onlySplitMain() {
+    tokenId = tokenId_;
+    zestyMarketAddress = IZestyMarket_ERC20_V1_1(zestyMarketAddress_);
+    for(uint256 i = 0; i < accounts_.length; i ++) {
+      accounts.push(accounts_[i]);
+      percentAllocations.push(percentAllocations_[i]);
+    }
+  }
 
   /** @notice Sends amount `amount` of ETH in proxy to SplitMain
    *  @dev payable reduces gas cost; no vulnerability to accidentally lock

@@ -209,7 +209,8 @@ contract SplitMain is ISplitMain, ReentrancyGuard {
     address[] calldata accounts,
     uint32[] calldata percentAllocations,
     uint32 distributorFee,
-    address controller
+    address controller,
+    uint256 tokenId
   )
     internal
     validSplit(accounts, percentAllocations, distributorFee)
@@ -230,6 +231,7 @@ contract SplitMain is ISplitMain, ReentrancyGuard {
     }
     // store split's hash in storage for future verification
     splits[split].hash = splitHash;
+    SplitWallet(split).init(tokenId, address(zestyMarketAddress), accounts, percentAllocations);
     emit CreateSplit(split);
   }
 
@@ -357,37 +359,6 @@ contract SplitMain is ISplitMain, ReentrancyGuard {
     );
   }
 
-  /** @notice Updates & distributes the ETH balance for split `split`
-   *  @dev only callable by SplitController
-   *  @param split Address of split to distribute balance for
-   *  @param accounts Ordered, unique list of addresses with ownership in the split
-   *  @param percentAllocations Percent allocations associated with each address
-   *  @param distributorFee Keeper fee paid by split to cover gas costs of distribution
-   *  @param distributorAddress Address to pay `distributorFee` to
-   */
-  function updateAndDistributeETH(
-    address split,
-    address[] calldata accounts,
-    uint32[] calldata percentAllocations,
-    uint32 distributorFee,
-    address distributorAddress
-  )
-    external
-    override
-    onlySplitController(split)
-    validSplit(accounts, percentAllocations, distributorFee)
-  {
-    _updateSplit(split, accounts, percentAllocations, distributorFee);
-    // know splitHash is valid immediately after updating; only accessible via controller
-    _distributeETH(
-      split,
-      accounts,
-      percentAllocations,
-      distributorFee,
-      distributorAddress
-    );
-  }
-
   /** @notice Distributes the ERC20 `token` balance for split `split`
    *  @dev `accounts`, `percentAllocations`, and `distributorFee` are verified by hashing
    *  & comparing to the hash in storage associated with split `split`
@@ -396,52 +367,18 @@ contract SplitMain is ISplitMain, ReentrancyGuard {
    *  @param tokenId NFT token Id
    */
   function distributeERC20(
-    uint256 tokenId
+    uint256 tokenId,
+    address[] calldata accounts,
+    uint32[] calldata percentAllocations
   ) external override {
     // use internal fn instead of modifier to avoid stack depth compiler errors
     _distributeERC20(
       tokenIdToSplits[tokenId],
-      supportedERC20Token,
+      ERC20(supportedERC20Token),
       accounts,
       percentAllocations,
       0,
       address(this)
-    );
-  }
-
-  /** @notice Updates & distributes the ERC20 `token` balance for split `split`
-   *  @dev only callable by SplitController
-   *  @dev pernicious ERC20s may cause overflow in this function inside
-   *  _scaleAmountByPercentage, but results do not affect ETH & other ERC20 balances
-   *  @param split Address of split to distribute balance for
-   *  @param token Address of ERC20 to distribute balance for
-   *  @param accounts Ordered, unique list of addresses with ownership in the split
-   *  @param percentAllocations Percent allocations associated with each address
-   *  @param distributorFee Keeper fee paid by split to cover gas costs of distribution
-   *  @param distributorAddress Address to pay `distributorFee` to
-   */
-  function updateAndDistributeERC20(
-    address split,
-    ERC20 token,
-    address[] calldata accounts,
-    uint32[] calldata percentAllocations,
-    uint32 distributorFee,
-    address distributorAddress
-  )
-    external
-    override
-    onlySplitController(split)
-    validSplit(accounts, percentAllocations, distributorFee)
-  {
-    _updateSplit(split, accounts, percentAllocations, distributorFee);
-    // know splitHash is valid immediately after updating; only accessible via controller
-    _distributeERC20(
-      split,
-      token,
-      accounts,
-      percentAllocations,
-      distributorFee,
-      distributorAddress
     );
   }
 
@@ -483,16 +420,16 @@ contract SplitMain is ISplitMain, ReentrancyGuard {
 
     owners[_tokenId] = msg.sender;
 
-    _zestyNFT.safeTransferFrom(msg.sender, address(this), _tokenId);
-    _zestyNFT.approve(address(zestyMarketAddress), _tokenId);
-    zestyMarketAddress.sellerNFTDeposit(_tokenId, _autoApprove);
-
     if(tokenIdToSplits[_tokenId] != address(0)) {
       // Already existing
       updateSplit(tokenIdToSplits[_tokenId], recipients_, shares_, 0);
     } else {
-      tokenIdToSplits[_tokenId] = createSplit(recipients_, shares_, 0, address(this));
+      tokenIdToSplits[_tokenId] = createSplit(recipients_, shares_, 0, address(this), _tokenId);
     }
+
+    _zestyNFT.safeTransferFrom(msg.sender, tokenIdToSplits[_tokenId], _tokenId);
+    _zestyNFT.approve(address(zestyMarketAddress), _tokenId);
+    zestyMarketAddress.sellerNFTDeposit(_tokenId, _autoApprove);
   }
 
   function sellerNFTWithdraw(uint256 _tokenId) external onlyDepositOwner(_tokenId) {
