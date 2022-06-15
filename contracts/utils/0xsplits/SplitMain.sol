@@ -431,7 +431,7 @@ contract SplitMain is ISplitMain, ReentrancyGuard {
     SplitWallet(tokenIdToSplits[_tokenId]).sellerNFTDeposit(_autoApprove);
   }
 
-  function authorizeOperator(uint256 _tokenId, address _operator) external {
+  function authorizeOperator(uint256 _tokenId, address _operator) external onlyDepositOwner() {
     require(tokenIdToSplits[_tokenId] != address(0), "Invalid tokenId");
     SplitWallet(tokenIdToSplits[_tokenId]).authorizeOperator(_operator);
   }
@@ -443,7 +443,7 @@ contract SplitMain is ISplitMain, ReentrancyGuard {
     uint256[] memory _contractTimeStart,
     uint256[] memory _contractTimeEnd,
     uint256[] memory _priceStart
-  ) external {
+  ) external onlyDepositOwner() {
     require(tokenIdToSplits[_tokenId] != address(0), "Invalid tokenId");
     SplitWallet(tokenIdToSplits[_tokenId]).sellerAuctionCreateBatch(_auctionTimeStart, _auctionTimeEnd, _contractTimeStart, _contractTimeEnd, _priceStart);
   }
