@@ -428,8 +428,24 @@ contract SplitMain is ISplitMain, ReentrancyGuard {
     }
 
     _zestyNFT.safeTransferFrom(msg.sender, tokenIdToSplits[_tokenId], _tokenId);
-    _zestyNFT.approve(address(zestyMarketAddress), _tokenId);
-    zestyMarketAddress.sellerNFTDeposit(_tokenId, _autoApprove);
+    SplitWallet(tokenIdToSplits[_tokenId]).sellerNFTDeposit(_autoApprove);
+  }
+
+  function authorizeOperator(uint256 _tokenId, address _operator) external {
+    require(tokenIdToSplits[_tokenId] != address(0), "Invalid tokenId");
+    SplitWallet(tokenIdToSplits[_tokenId]).authorizeOperator(_operator);
+  }
+
+  function sellerAuctionCreateBatch(
+    uint256 _tokenId,
+    uint256[] memory _auctionTimeStart,
+    uint256[] memory _auctionTimeEnd,
+    uint256[] memory _contractTimeStart,
+    uint256[] memory _contractTimeEnd,
+    uint256[] memory _priceStart
+  ) external {
+    require(tokenIdToSplits[_tokenId] != address(0), "Invalid tokenId");
+    SplitWallet(tokenIdToSplits[_tokenId]).sellerAuctionCreateBatch(_auctionTimeStart, _auctionTimeEnd, _contractTimeStart, _contractTimeEnd, _priceStart);
   }
 
   function sellerNFTWithdraw(uint256 _tokenId) external onlyDepositOwner(_tokenId) {

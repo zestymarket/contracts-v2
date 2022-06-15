@@ -50,6 +50,7 @@ interface IZestyMarket_ERC20_V1_1 {
             uint256 contractValue,
             uint8 withdrawn
         );
+    function authorizeOperator(address _operator) external;
     function buyerCampaignCreate(string memory _uri) external;
     function sellerNFTDeposit(
         uint256 _tokenId,

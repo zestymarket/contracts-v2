@@ -5,7 +5,7 @@ import {ISplitMain} from './ISplitMain.sol';
 import {ERC20} from './ERC20.sol';
 import {SafeTransferLib} from './SafeTransferLib.sol';
 import "../../interfaces/IZestyMarket_ERC20_V1_1.sol";
-
+import "../../interfaces/IZestyNFT.sol";
 /**
  * ERRORS
  */
@@ -85,6 +85,28 @@ contract SplitWallet {
       accounts.push(accounts_[i]);
       percentAllocations.push(percentAllocations_[i]);
     }
+  }
+
+  function sellerNFTDeposit(uint8 _autoApprove) external onlySplitMain() {
+    IZestyNFT _zestyNFT = IZestyNFT(zestyMarketAddress.getZestyNFTAddress());
+
+    // NFT was already transferred so no need to check ownership here
+    _zestyNFT.approve(address(zestyMarketAddress), tokenId);
+    zestyMarketAddress.sellerNFTDeposit(tokenId, _autoApprove);
+  }
+
+  function authorizeOperator(address _operator) external onlySplitMain() {
+    zestyMarketAddress.authorizeOperator(_operator);
+  }
+
+  function sellerAuctionCreateBatch (
+    uint256[] memory _auctionTimeStart,
+    uint256[] memory _auctionTimeEnd,
+    uint256[] memory _contractTimeStart,
+    uint256[] memory _contractTimeEnd,
+    uint256[] memory _priceStart
+  ) external onlySplitMain() {
+    zestyMarketAddress.sellerAuctionCreateBatch(tokenId, _auctionTimeStart, _auctionTimeEnd, _contractTimeStart, _contractTimeEnd, _priceStart);
   }
 
   /** @notice Sends amount `amount` of ETH in proxy to SplitMain
