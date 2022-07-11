@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity >=0.6.2 <0.8.0;
+pragma solidity >=0.6.2;
 
 interface IZestyMarket_ERC20_V1_1 {
+    function getZestyNFTAddress() external view returns (address);
     function getTxTokenAddress() external view returns (address);
     function getZestyCut() external view returns (uint256);
     function getSellerNFTSetting(uint256 _tokenId)
@@ -49,6 +50,7 @@ interface IZestyMarket_ERC20_V1_1 {
             uint256 contractValue,
             uint8 withdrawn
         );
+    function authorizeOperator(address _operator) external;
     function buyerCampaignCreate(string memory _uri) external;
     function sellerNFTDeposit(
         uint256 _tokenId,
