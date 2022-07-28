@@ -9,11 +9,11 @@ import "../interfaces/IZestyNFT.sol";
 import "../interfaces/ISplitMain.sol";
 import "../utils/ERC20.sol";
 
-contract ZestyRevenueShareWrapper is ReentrancyGuard {
+contract ZestySplitMain is ReentrancyGuard {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   IZestyMarket_ERC20_V1_1 public zestyMarketAddress;
-  // main address on polygon 0x2ed6c4B5dA6378c7897AC67Ba9e43102Feb694EE 
+  // main address on polygon 0x2ed6c4B5dA6378c7897AC67Ba9e43102Feb694EE
   ISplitMain public immutable splitMain;
   ERC20 public supportedERC20Token;
   mapping(uint256 => address) public owners;
